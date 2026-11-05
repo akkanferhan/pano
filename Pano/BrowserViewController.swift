@@ -301,9 +301,13 @@ final class BrowserViewController: UIViewController {
             t.mainRequestURL = url.absoluteString
             t.blockedAtStart = AdBlocker.blockedCount
             t.loadStartedAt = Date()
-            if t === activeTab { stopVideoWatch() }
             t.isReader = false
-            if t === activeTab { resetFind() }
+            // Bu yöntem WebThread'den çağrılabilir: arayüz / zamanlayıcı işleri ana iş parçacığına.
+            DispatchQueue.main.async { [weak self, weak t] in
+                guard let self, let t, t === self.activeTab else { return }
+                self.stopVideoWatch()
+                self.resetFind()
+            }
         }
         return true
     }
@@ -780,6 +784,8 @@ final class BrowserViewController: UIViewController {
         let src: String
         let time: Double
         let paused: Bool
+        /// Sayfanın bu video için en son play() istediği an (ms, 0 = hiç).
+        let playRequested: Double
         let playable: Bool
         let blob: Bool
         let referer: String?
@@ -795,6 +801,7 @@ final class BrowserViewController: UIViewController {
             for item in list {
                 guard let src = item["src"] as? String else { continue }
                 out.append(FoundVideo(src: src, time: item["t"] as? Double ?? 0, paused: item["paused"] as? Bool ?? true,
+                                      playRequested: item["req"] as? Double ?? 0,
                                       playable: item["playable"] as? Bool ?? false, blob: item["blob"] as? Bool ?? false,
                                       referer: item["href"] as? String))
             }
@@ -832,8 +839,11 @@ final class BrowserViewController: UIViewController {
                 return
             }
             let videos = self.allVideos()
+            // Tıklamadan sonra yeni çıkan ya da oynatılması istenen (play()) video.
+            let clickMs = since.timeIntervalSince1970 * 1000 - 100
             let started = videos.first { v in
-                v.playable && (baseline[v.src] == nil || (baseline[v.src] == true && !v.paused))
+                v.playable && (baseline[v.src] == nil || v.playRequested >= clickMs ||
+                    (baseline[v.src] == true && !v.paused))
             }
             if let v = started {
                 self.stopVideoWatch()

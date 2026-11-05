@@ -35,7 +35,10 @@ final class WebEngine {
         view.setValue(bridge, forKey: "delegate")
         view.setValue(true, forKey: "scalesPageToFit")
         view.setValue(true, forKey: "allowsInlineMediaPlayback")
-        view.setValue(false, forKey: "mediaPlaybackRequiresUserAction")
+        // Sayfa içi video oynatma kapalı: videolar her zaman tvOS oynatıcısında açılıyor. WebKit'in kendi video
+        // arayüzü tvOS'ta WebThread'den UIKit'e dokunup uygulamayı çökertebiliyor ("…is main-thread only").
+        // Kumandayla gerçek dokunuş olmadığı için bu ayar web videolarının kendiliğinden başlamasını tamamen engeller.
+        view.setValue(true, forKey: "mediaPlaybackRequiresUserAction")
         view.backgroundColor = .black
         view.isOpaque = false
     }
@@ -153,17 +156,41 @@ final class WebEngine {
 private final class DelegateBridge: NSObject {
     weak var owner: WebEngine?
 
+    /// WebKit1 bildirimleri bazen WebThread'den gelebilir; arayüze dokunan her şey ana iş parçacığında çalışmalı.
+    private func onMain(_ work: @escaping () -> Void) {
+        if Thread.isMainThread {
+            work()
+        } else {
+            #if DEBUG
+            noteOffMain()
+            #endif
+            DispatchQueue.main.async(execute: work)
+        }
+    }
+
     @objc(webViewDidStartLoad:)
-    func didStart(_ webView: UIView) { owner?.onStart?() }
+    func didStart(_ webView: UIView) { onMain { [weak self] in self?.owner?.onStart?() } }
 
     @objc(webViewDidFinishLoad:)
-    func didFinish(_ webView: UIView) { owner?.onFinish?() }
+    func didFinish(_ webView: UIView) { onMain { [weak self] in self?.owner?.onFinish?() } }
 
     @objc(webView:didFailLoadWithError:)
-    func didFail(_ webView: UIView, error: NSError) { owner?.onFail?(error) }
+    func didFail(_ webView: UIView, error: NSError) { onMain { [weak self] in self?.owner?.onFail?(error) } }
 
+    /// Eşzamanlı yanıt gerektiği için iş parçacığı değiştirilemez; çağrılan kod arayüze dokunmamalı.
     @objc(webView:shouldStartLoadWithRequest:navigationType:)
     func shouldStart(_ webView: UIView, request: URLRequest, navigationType: Int) -> Bool {
-        owner?.shouldLoad?(request, navigationType) ?? true
+        #if DEBUG
+        if !Thread.isMainThread { noteOffMain() }
+        #endif
+        return owner?.shouldLoad?(request, navigationType) ?? true
     }
+
+    #if DEBUG
+    private func noteOffMain() {
+        let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("off-main.txt")
+        try? "WebView bildirimi ana iş parçacığı dışından geldi: \(Thread.current)\n\(Thread.callStackSymbols.prefix(12).joined(separator: "\n"))"
+            .write(to: url, atomically: true, encoding: .utf8)
+    }
+    #endif
 }
