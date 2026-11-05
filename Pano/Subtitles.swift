@@ -11,7 +11,7 @@ struct SubtitleTrack {
     let label: String
     let language: String?
     let cues: [SubtitleCue]
-    let source: String // tekrarları ayıklamak için (adres veya "sayfa:<etiket>")
+    let source: String // tekrarları ayıklamak için (address or "page:<label>")
 }
 
 /// Henüz yüklenmemiş altyazı kaynağı: bir dosya adresi ya da sayfadaki oynatıcıdan okunmuş satırlar.
@@ -22,7 +22,7 @@ enum SubtitleSource {
     var key: String {
         switch self {
         case let .url(url, _, _, _): return url.absoluteString
-        case let .cues(_, label, language): return "sayfa:\(label)|\(language ?? "")"
+        case let .cues(_, label, language): return "page:\(label)|\(language ?? "")"
         }
     }
 }
@@ -34,11 +34,10 @@ enum Subtitles {
     static func describe(label: String, language: String?, url: URL?) -> (label: String, language: String?) {
         let lang = (language?.isEmpty == false ? language : guessLanguage(label + " " + (url?.lastPathComponent ?? "")))
         if !label.isEmpty { return (label, lang) }
-        switch lang {
-        case "tr": return ("Türkçe", lang)
-        case "en": return ("İngilizce", lang)
-        default: return (url?.lastPathComponent ?? "Altyazı", lang)
+        if let lang, let name = Locale.current.localizedString(forLanguageCode: lang) {
+            return (name.prefix(1).uppercased() + name.dropFirst(), lang)
         }
+        return (url?.lastPathComponent ?? L("Subtitle"), lang)
     }
 
     static func guessLanguage(_ text: String) -> String? {
@@ -49,9 +48,13 @@ enum Subtitles {
         return nil
     }
 
-    static func isTurkish(_ track: SubtitleTrack) -> Bool {
-        if let l = track.language?.lowercased(), l.hasPrefix("tr") || l == "tur" { return true }
-        return guessLanguage(track.label) == "tr"
+    /// Is the track in the app's language? (e.g. Turkish subtitles are preferred in a Turkish UI.)
+    static func isPreferred(_ track: SubtitleTrack) -> Bool {
+        let want = AppLanguage.shortCode
+        if let l = track.language?.lowercased(), l.hasPrefix(want) || (want == "tr" && l == "tur") { return true }
+        if guessLanguage(track.label) == want { return true }
+        let name = Locale.current.localizedString(forLanguageCode: want)?.lowercased() ?? want
+        return track.label.lowercased().contains(name)
     }
 
     // MARK: Yükleme

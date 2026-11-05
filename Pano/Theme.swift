@@ -183,7 +183,7 @@ final class ChromeBar: UIView {
         titleLabel.textColor = .white
         hostLabel.font = .systemFont(ofSize: 19, weight: .medium)
         hostLabel.textColor = Theme.textSecondary
-        privateBadge.attributedText = Theme.label("Gizli", symbol: "eye.slash.fill", size: 19)
+        privateBadge.attributedText = Theme.label(L("Private"), symbol: "eye.slash.fill", size: 19)
         privateBadge.backgroundColor = Theme.violet.withAlphaComponent(0.9)
         tabsBadge.backgroundColor = UIColor(white: 1, alpha: 0.14)
         [iconBackground, icon, spinner, titleLabel, hostLabel, privateBadge, tabsBadge, modeBadge].forEach { blur.contentView.addSubview($0) }
@@ -236,7 +236,7 @@ final class ChromeBar: UIView {
     }
 
     func setBadges(cursorMode: Bool, tabCount: Int, isPrivate: Bool) {
-        modeBadge.attributedText = Theme.label(cursorMode ? "İmleç" : "Kaydırma",
+        modeBadge.attributedText = Theme.label(cursorMode ? L("Cursor") : L("Scroll"),
                                                symbol: cursorMode ? "cursorarrow" : "arrow.up.and.down", size: 19)
         modeBadge.backgroundColor = cursorMode ? Theme.violet.withAlphaComponent(0.85) : Theme.teal.withAlphaComponent(0.85)
         tabsBadge.attributedText = Theme.label("\(tabCount)", symbol: "square.on.square", size: 19)

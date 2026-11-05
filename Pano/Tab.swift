@@ -3,7 +3,7 @@ import UIKit
 /// Bir tarayıcı sekmesi: kendi web motoru ve durumu.
 final class Tab {
     var engine: WebEngine!
-    var title = "Ana Sayfa"
+    var title = L("Home")
     /// Yüklenmiş gerçek sayfa adresi (ana sayfa / hata sayfasında nil).
     var url: URL?
     var isHome = true

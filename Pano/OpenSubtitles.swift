@@ -46,8 +46,8 @@ enum OpenSubtitles {
             } else if !(200..<300).contains(status) {
                 message = (json?["message"] as? String)
                     ?? (json?["errors"] as? [String])?.joined(separator: ", ")
-                    ?? "Sunucu hatası (HTTP \(status))"
-                if status == 401 || status == 403 { message = (message ?? "") + " — API anahtarını kontrol et." }
+                    ?? L("Server error (HTTP %d)", status)
+                if status == 401 || status == 403 { message = (message ?? "") + " — " + L("check the API key.") }
             }
             DispatchQueue.main.async { completion(message == nil ? json : nil, message) }
         }.resume()
@@ -58,19 +58,19 @@ enum OpenSubtitles {
     static func search(query: String, season: Int?, episode: Int?,
                        completion: @escaping ([Item], String?) -> Void) {
         var q = [URLQueryItem(name: "query", value: query.lowercased()),
-                 URLQueryItem(name: "languages", value: "tr"),
+                 URLQueryItem(name: "languages", value: AppLanguage.subtitleCode),
                  URLQueryItem(name: "order_by", value: "download_count")]
         if let season { q.append(URLQueryItem(name: "season_number", value: String(season))) }
         if let episode { q.append(URLQueryItem(name: "episode_number", value: String(episode))) }
-        guard let r = request("subtitles", query: q) else { return completion([], "OpenSubtitles API anahtarı girilmemiş.") }
+        guard let r = request("subtitles", query: q) else { return completion([], L("No OpenSubtitles API key entered.")) }
         send(r) { json, error in
-            guard let data = json?["data"] as? [[String: Any]] else { return completion([], error ?? "Sonuç alınamadı") }
+            guard let data = json?["data"] as? [[String: Any]] else { return completion([], error ?? L("Couldn't get results")) }
             let items: [Item] = data.compactMap { entry in
                 guard let a = entry["attributes"] as? [String: Any],
                       let file = (a["files"] as? [[String: Any]])?.first,
                       let id = file["file_id"] as? Int else { return nil }
                 let release = (a["release"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-                    ?? (file["file_name"] as? String) ?? "Altyazı \(id)"
+                    ?? (file["file_name"] as? String) ?? L("Subtitle %d", id)
                 return Item(fileID: id, release: release, downloads: a["download_count"] as? Int ?? 0)
             }
             completion(items, nil)
@@ -79,16 +79,16 @@ enum OpenSubtitles {
 
     static func download(_ item: Item, completion: @escaping ([SubtitleCue]?, String?) -> Void) {
         guard let r = request("download", method: "POST", body: ["file_id": item.fileID, "sub_format": "srt"]) else {
-            return completion(nil, "OpenSubtitles API anahtarı girilmemiş.")
+            return completion(nil, L("No OpenSubtitles API key entered."))
         }
         send(r) { json, error in
             guard let link = (json?["link"] as? String).flatMap(URL.init(string:)) else {
-                return completion(nil, error ?? (json?["message"] as? String) ?? "İndirme bağlantısı alınamadı")
+                return completion(nil, error ?? (json?["message"] as? String) ?? L("Couldn't get a download link"))
             }
             URLSession.shared.dataTask(with: link) { data, _, err in
                 let cues = data.flatMap(Subtitles.decode).map(Subtitles.parse)
                 DispatchQueue.main.async {
-                    if let cues, !cues.isEmpty { completion(cues, nil) } else { completion(nil, err?.localizedDescription ?? "Altyazı dosyası okunamadı") }
+                    if let cues, !cues.isEmpty { completion(cues, nil) } else { completion(nil, err?.localizedDescription ?? L("Couldn't read the subtitle file")) }
                 }
             }.resume()
         }
@@ -96,7 +96,7 @@ enum OpenSubtitles {
 
     static func login(username: String, password: String, completion: @escaping (String?) -> Void) {
         guard let r = request("login", method: "POST", body: ["username": username, "password": password], auth: false) else {
-            return completion("Önce API anahtarını gir.")
+            return completion(L("Enter the API key first."))
         }
         send(r) { json, error in
             if let token = json?["token"] as? String {
@@ -104,7 +104,7 @@ enum OpenSubtitles {
                 Store.shared.openSubtitlesUser = username
                 completion(nil)
             } else {
-                completion(error ?? "Giriş yapılamadı")
+                completion(error ?? L("Couldn't sign in"))
             }
         }
     }

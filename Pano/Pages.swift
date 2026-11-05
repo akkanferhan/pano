@@ -111,31 +111,35 @@ enum Pages {
                 : String(format: "%d:%02d", pos / 60, pos % 60)
             return """
             <a class="cw" href="\(esc(w.pageURL))"><div class="play"></div><b>\(esc(w.title))</b>\
-            <span>\(esc(host)) · \(time)'den devam</span><div class="bar"><i style="width:\(pct)%"></i></div></a>
+            <span>\(esc(host)) · \(esc(L("Resume at %@", time)))</span><div class="bar"><i style="width:\(pct)%"></i></div></a>
             """
         }.joined()
-        let watchingSection = watching.isEmpty ? "" : "<h2>İzlemeye devam</h2><div class=\"row\">\(watching)</div>"
-        let privatePill = isPrivate ? "<span class=\"pill\">Gizli gezinme</span>" : ""
+        let watchingSection = watching.isEmpty ? "" : "<h2>\(esc(L("Continue watching")))</h2><div class=\"row\">\(watching)</div>"
+        let direction = AppLanguage.current.hasPrefix("ar") ? "rtl" : "ltr"
+        let greetingsJSON = "[" + [L("Good morning"), L("Good afternoon"), L("Good evening"), L("Good night")].map(jsString).joined(separator: ",") + "]"
+        let privatePill = isPrivate ? "<span class=\"pill\">\(esc(L("Private browsing")))</span>" : ""
         return """
-        <!doctype html><html data-pano="home"><head><meta charset="utf-8"><meta name="viewport" content="width=1600">
-        <title>Ana Sayfa</title>\(style)</head><body><div class="bg"></div>
+        <!doctype html><html data-pano="home" lang="\(AppLanguage.current)" dir="\(direction)"><head><meta charset="utf-8"><meta name="viewport" content="width=1600">
+        <title>\(esc(L("Home")))</title>\(style)</head><body><div class="bg"></div>
         <header><div><div class="brand"><div class="logo"><b></b></div>Pano\(privatePill)</div>
-        <div class="hello" id="hello">Merhaba</div><div class="date" id="date"></div></div>
+        <div class="hello" id="hello">\(esc(L("Hello")))</div><div class="date" id="date"></div></div>
         <div class="clock" id="clock"></div></header>
         <form action="pano://search" method="get"><div class="search">\(searchIcon)
-        <input type="search" name="q" placeholder="\(esc(engine.name)) ile ara veya adres yaz"></div></form>
+        <input type="search" name="q" placeholder="\(esc(L("Search with %@ or enter an address", engine.name)))"></div></form>
         \(watchingSection)
-        <h2>Sık Kullanılanlar</h2>
-        <div class="row">\(tiles.isEmpty ? "<div class=\"empty\">Henüz sık kullanılan yok — bir sitedeyken menüden ekleyebilirsin.</div>" : tiles)</div>
-        <div class="hints"><span><b>Basılı tut</b>Menü</span><span><b>Oynat ×2</b>Adres</span><span><b>Oynat basılı</b>Sekmeler</span><span><b>Oynat</b>İmleç / kaydırma</span><span><b>Menü</b>Geri</span></div>
+        <h2>\(esc(L("Favorites")))</h2>
+        <div class="row">\(tiles.isEmpty ? "<div class=\"empty\">\(esc(L("No favorites yet — add one from the menu while on a site.")))</div>" : tiles)</div>
+        <div class="hints"><span><b>\(esc(L("Play")))</b>\(esc(L("Menu")))</span><span><b>\(esc(L("Play hold")))</b>\(esc(L("Tabs")))</span><span><b>\(esc(L("Hold")))</b>\(esc(L("Cursor / scroll")))</span><span><b>\(esc(L("Menu")))</b>\(esc(L("Back")))</span></div>
         <script>
         (function(){
-          var days = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
-          var months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+          var lang = \(jsString(AppLanguage.current));
+          var greet = \(greetingsJSON);
           function tick(){
             var d = new Date(), h = d.getHours();
-            document.getElementById('hello').textContent = h < 5 ? 'İyi geceler' : h < 12 ? 'Günaydın' : h < 18 ? 'İyi günler' : h < 22 ? 'İyi akşamlar' : 'İyi geceler';
-            document.getElementById('date').textContent = d.getDate() + ' ' + months[d.getMonth()] + ' ' + days[d.getDay()];
+            document.getElementById('hello').textContent = h < 5 ? greet[3] : h < 12 ? greet[0] : h < 18 ? greet[1] : h < 22 ? greet[2] : greet[3];
+            var date = '';
+            try { date = d.toLocaleDateString(lang, {weekday:'long', day:'numeric', month:'long'}); } catch(e) { date = d.toDateString(); }
+            document.getElementById('date').textContent = date;
             document.getElementById('clock').textContent = ('0'+h).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
           }
           tick(); setInterval(tick, 15000);
@@ -146,14 +150,15 @@ enum Pages {
     }
 
     static func error(url: String, message: String) -> String {
-        """
-        <!doctype html><html data-pano="error"><head><meta charset="utf-8"><meta name="viewport" content="width=1600">
-        <title>Sayfa açılamadı</title>\(style)</head><body><div class="bg"></div><div class="err">
+        let dir = AppLanguage.current.hasPrefix("ar") ? "rtl" : "ltr"
+        return """
+        <!doctype html><html data-pano="error" lang="\(AppLanguage.current)" dir="\(dir)"><head><meta charset="utf-8"><meta name="viewport" content="width=1600">
+        <title>\(esc(L("Couldn't open the page")))</title>\(style)</head><body><div class="bg"></div><div class="err">
         <div class="icon">!</div>
-        <h1>Sayfa açılamadı</h1>
+        <h1>\(esc(L("Couldn't open the page")))</h1>
         <p>\(esc(message))</p>
         <p><span class="url">\(esc(url))</span></p>
-        <p style="margin-top:40px">Seçim tuşuna basılı tutup menüden <b>Yenile</b>'yi seçerek yeniden deneyebilirsin.</p>
+        <p style="margin-top:40px">\(esc(L("Hold the select button and choose Reload from the menu to try again.")))</p>
         </div></body></html>
         """
     }

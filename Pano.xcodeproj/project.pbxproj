@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2D5B9D47E614864EA06B5B9F /* Pages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 694F97CD52207D197409DF84 /* Pages.swift */; };
+		2EB4999F201C4DD0E38557FB /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 4CF70729464965567762B857 /* Localizable.xcstrings */; };
 		3163D7E858A9FFB8ED692599 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B1AFC18075CE2091DB2B3E /* Theme.swift */; };
 		34093FAC2233854889002299 /* RemoteServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCE0250DD7F7999CDDC4ADD4 /* RemoteServer.swift */; };
 		4F38DFE260CA6A917AE50F36 /* OpenSubtitles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8EDC015B796449FB35B0A5 /* OpenSubtitles.swift */; };
@@ -16,6 +17,8 @@
 		73302B1720F15C0F4202A92A /* TabSwitcherController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1960C2CC6034C17D823E7909 /* TabSwitcherController.swift */; };
 		7594553895D0CB341E124A3F /* BrowserViewController+Remote.swift in Sources */ = {isa = PBXBuildFile; fileRef = F445FB38AA8FF8D6FE24F72D /* BrowserViewController+Remote.swift */; };
 		80C67AD9DD050995062FD748 /* VideoPlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365FE3C96C85007BC20A5EC3 /* VideoPlayerController.swift */; };
+		8DECB5E057FEE70E9B814ECE /* SearchController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E561A4B50FD1EB68011646B2 /* SearchController.swift */; };
+		8E57B1CBD0E3A2FE68234548 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FFCD80C4BB83B9C580E4B35 /* Localization.swift */; };
 		9307D2A20A245D1DC6C30A5B /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0623588F177B0E7311BB66DE /* Store.swift */; };
 		9AAE10D7EC668C2939BE30F5 /* MenuPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06F82F9777167F638954223C /* MenuPanel.swift */; };
 		B6117B92D7F313C88214FB55 /* BrowserViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0472B9780599C9A600AD9006 /* BrowserViewController.swift */; };
@@ -35,9 +38,11 @@
 		06F82F9777167F638954223C /* MenuPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPanel.swift; sourceTree = "<group>"; };
 		18FFD055FC17CB4A48EE30E2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1960C2CC6034C17D823E7909 /* TabSwitcherController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitcherController.swift; sourceTree = "<group>"; };
+		1FFCD80C4BB83B9C580E4B35 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		24816FD7623B37E865E76662 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		365FE3C96C85007BC20A5EC3 /* VideoPlayerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPlayerController.swift; sourceTree = "<group>"; };
 		3C4DF0909AE0BBC9E53CB2B6 /* LayoutGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutGuard.swift; sourceTree = "<group>"; };
+		4CF70729464965567762B857 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		6540C2E2370AD359ED7BF453 /* AdBlocker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdBlocker.swift; sourceTree = "<group>"; };
 		694F97CD52207D197409DF84 /* Pages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pages.swift; sourceTree = "<group>"; };
 		6C8EDC015B796449FB35B0A5 /* OpenSubtitles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenSubtitles.swift; sourceTree = "<group>"; };
@@ -50,6 +55,7 @@
 		C3B1AFC18075CE2091DB2B3E /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		CCE0250DD7F7999CDDC4ADD4 /* RemoteServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServer.swift; sourceTree = "<group>"; };
 		DD5C87446151E0A8573B4B1D /* RemoteInfoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteInfoViewController.swift; sourceTree = "<group>"; };
+		E561A4B50FD1EB68011646B2 /* SearchController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchController.swift; sourceTree = "<group>"; };
 		E881610FD10C67278F9247E8 /* WebEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebEngine.swift; sourceTree = "<group>"; };
 		F445FB38AA8FF8D6FE24F72D /* BrowserViewController+Remote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrowserViewController+Remote.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -66,12 +72,15 @@
 				F445FB38AA8FF8D6FE24F72D /* BrowserViewController+Remote.swift */,
 				18FFD055FC17CB4A48EE30E2 /* Info.plist */,
 				3C4DF0909AE0BBC9E53CB2B6 /* LayoutGuard.swift */,
+				4CF70729464965567762B857 /* Localizable.xcstrings */,
+				1FFCD80C4BB83B9C580E4B35 /* Localization.swift */,
 				78ADAF404D56F0CF0D4453E8 /* MediaSniffer.swift */,
 				06F82F9777167F638954223C /* MenuPanel.swift */,
 				6C8EDC015B796449FB35B0A5 /* OpenSubtitles.swift */,
 				694F97CD52207D197409DF84 /* Pages.swift */,
 				DD5C87446151E0A8573B4B1D /* RemoteInfoViewController.swift */,
 				CCE0250DD7F7999CDDC4ADD4 /* RemoteServer.swift */,
+				E561A4B50FD1EB68011646B2 /* SearchController.swift */,
 				0623588F177B0E7311BB66DE /* Store.swift */,
 				A8DA55794B86B7F05B6ACEE3 /* Subtitles.swift */,
 				AD13DC09C6B6022F075E1F2C /* Tab.swift */,
@@ -140,7 +149,17 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
+				ar,
+				de,
 				en,
+				es,
+				fr,
+				hi,
+				ja,
+				"pt-BR",
+				ru,
+				tr,
+				"zh-Hans",
 			);
 			mainGroup = DE99606B32239831455A34F4;
 			minimizedProjectReferenceProxies = 1;
@@ -160,6 +179,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E0836501AEA113ACD3D26993 /* Assets.xcassets in Resources */,
+				2EB4999F201C4DD0E38557FB /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -176,12 +196,14 @@
 				7594553895D0CB341E124A3F /* BrowserViewController+Remote.swift in Sources */,
 				B6117B92D7F313C88214FB55 /* BrowserViewController.swift in Sources */,
 				5D84D45323794F4DE51B47C1 /* LayoutGuard.swift in Sources */,
+				8E57B1CBD0E3A2FE68234548 /* Localization.swift in Sources */,
 				C1A9058AC50E83C6E55F8C44 /* MediaSniffer.swift in Sources */,
 				9AAE10D7EC668C2939BE30F5 /* MenuPanel.swift in Sources */,
 				4F38DFE260CA6A917AE50F36 /* OpenSubtitles.swift in Sources */,
 				2D5B9D47E614864EA06B5B9F /* Pages.swift in Sources */,
 				5E0150DAF4FCAB71A7CB4084 /* RemoteInfoViewController.swift in Sources */,
 				34093FAC2233854889002299 /* RemoteServer.swift in Sources */,
+				8DECB5E057FEE70E9B814ECE /* SearchController.swift in Sources */,
 				9307D2A20A245D1DC6C30A5B /* Store.swift in Sources */,
 				BF6D7725BC74D9B995194E7B /* Subtitles.swift in Sources */,
 				CED7972C6316B6E47B428D44 /* Tab.swift in Sources */,

@@ -1,74 +1,105 @@
 # Pano
 
-Apple TV (tvOS) için kişisel web tarayıcısı.
+A personal web browser for Apple TV (tvOS), driven by the Siri Remote.
 
-tvOS'ta WebKit/WKWebView açık API değil. Pano, UIKit içinde çalışma zamanında hâlâ bulunan
-`UIWebView` sınıfını `NSClassFromString` ile kullanır (bkz. `Pano/WebEngine.swift`).
-Bu özel API sayıldığı için **App Store'a gönderilemez**; yalnızca Xcode ile kendi cihazına yükleme içindir.
+tvOS does not ship WebKit/WKWebView as public API. Pano uses the `UIWebView` class that still exists in UIKit
+at runtime, created through `NSClassFromString` (see `Pano/WebEngine.swift`). Because this is private API, the app
+**cannot be submitted to the App Store**; it is meant for sideloading onto your own device with Xcode.
 
-## Kurulum (Apple TV'ye yükleme)
+## Installing on an Apple TV
 
-1. Apple TV: Ayarlar → Uzaktan Uygulamalar ve Aygıtlar → Mac'teki Xcode ile eşleştir
-   (Mac ve Apple TV aynı ağda olmalı; Xcode → Window → Devices and Simulators).
-2. `xcodegen generate` (project.yml değişirse) → `Pano.xcodeproj`'u aç.
-3. Hedef cihaz olarak Apple TV'yi seç, Run (⌘R).
-   Ücretsiz Apple ID ile imzalanan uygulamalar 7 günde bir yeniden yüklenmeli; ücretli geliştirici hesabında 1 yıl.
+1. On the Apple TV: Settings → Remotes and Devices → Remote App and Devices, then pair it with Xcode on your Mac
+   (both on the same network; Xcode → Window → Devices and Simulators).
+2. Run `xcodegen generate` (whenever `project.yml` or the file list changes) and open `Pano.xcodeproj`.
+3. Pick the Apple TV as the run destination and press Run (⌘R).
+   Apps signed with a free Apple ID must be reinstalled every 7 days; with a paid developer account, once a year.
 
-## Tasarım
+## Languages
 
-Koyu zemin üzerinde mor → pembe vurgular ve cam (blur) yüzeyler. Katmanlı (parallax) tvOS ikonu ve Top Shelf görselleri
-`scripts/make-icons.py` ile üretilir (`python3 scripts/make-icons.py . onizleme.png`, Pillow gerekir); aynı görsel dil ana sayfada (selamlama, saat, site simgeli kutucuklar),
-kendiliğinden gizlenen yüzen üst çubukta, iPadOS tarzı imleçte, cam bildirimlerde ve telefon kumanda sayfasında kullanılır
-(`Pano/Theme.swift`).
+The UI is localized into the most widely used languages plus Turkish: English, Simplified Chinese, Hindi, Spanish,
+French, Arabic, Brazilian Portuguese, Russian, German, Japanese and Turkish (`Pano/Localizable.xcstrings`).
+Keys are English; the system language is used by default, and Settings → Language offers an in-app override
+(applied after restarting the app). Use `L("…")` / `L("… %@", value)` from `Pano/Localization.swift` for new strings.
 
-## Özellikler
+## Design
 
-- **Sekmeler** (en fazla 8): bağlantıyı yeni sekmede açma, `window.open` açılır pencereleri arka plan sekmesine yönlendirme
-- **Kaldığın yerden devam**: açık sekmeler uygulama yeniden açılınca geri gelir (sekmeler ihtiyaç anında yüklenir)
-- **Yakınlaştırma**: sayfanın tamamını büyütür (%75–250), site başına hatırlanır; ayrıca varsayılan yakınlaştırma ve yazı boyutu
-- **Reklam/izleyici engelleme** (şimdilik varsayılan kapalı, Ayarlar'dan açılır): `URLProtocol` ile ~170 reklam/izleme alan adı engellenir, boş reklam kutuları CSS ile gizlenir
-- **Akıllı imleç**: tıklanabilir öğe üstünde büyür ve yavaşlar; açılır menüler için fare-üstü olayları gönderir
-- **Okuma modu**: makalenin ana metnini büyük yazılı, koyu bir sayfada gösterir
-- **Film sitesi oynatıcıları**: tıklama, başka siteden gelen oynatıcı iframe'lerinin içine iletilir (WebKit1 `WebFrame` API'si köken kısıtına takılmaz).
-  Tıklamadan sonra ~12 sn içinde başlayan video ya da ağdan istenen `.m3u8`/`.mp4` adresi yakalanıp tvOS oynatıcısında,
-  doğru Referer/Origin başlıklarıyla otomatik açılır. Menüde "Videoyu tam ekran oynat" bulunan tüm adayları listeler.
-  Oynatıcı açılırken sitenin harici altyazıları (`<track>`, sayfadaki oynatıcının yüklediği satırlar, ağdan istenen
-  `.vtt`/`.srt` dosyaları, oynatıcı ayarlarında geçen adresler) toplanır ve videonun üstünde gösterilir; Türkçe olan
-  otomatik seçilir, Windows-1254 SRT'ler doğru çözülür. Oynatıcının üst çubuğunda altyazı seçimi, zamanlama kaydırma
-  (±0,5 / ±2 sn) ve yazı boyutu menüleri var. HLS akışına gömülü Türkçe altyazı varsa o seçilir.
-  Not: bu motorda `MediaSource` yok; videoyu yalnızca MSE ile oynatan (blob:) ve DRM'li oynatıcılar desteklenmez.
-- **Sayfada bul**: tüm eşleşmeleri vurgular, ◀ ▶ ile gezilir
-- **Kaldığın yerden izle**: oynatıcı kapanınca (ve her 10 sn'de) konum sayfa adresine göre kaydedilir; aynı sayfada video açılınca
-  "Devam et / Baştan başla" sorulur. Ana sayfada "İzlemeye devam" bölümü (ilerleme çubuklu).
-- **Sonraki bölüm**: sayfadaki "sonraki bölüm" bağlantısı (yoksa adresteki bölüm numarası +1, "tahmini") bulunur; oynatıcı menüsünde,
-  son 2 dakikada ekranda düğme, bölüm bitince 10 sn geri sayım. Yeni sayfada oynatıcı bulunup otomatik tıklanır.
-- **Kaynak seçici**: "Kaynak 1 / Alternatif / Türkçe Dublaj / data-frame…" düğmeleri menüde listelenir (kategori bağlantıları hariç).
-- **Oynatıcı**: Hız (0,75–2×), Sar (adım 10/15/30/60 sn, "Jeneriği atla +85 sn"), altyazı görünümü (boyut, beyaz/sarı, kutu arka plan).
-- **OpenSubtitles**: oynatıcı → Altyazı → İnternetten bul. Ayarlar'dan API anahtarı (opensubtitles.com/consumers), isteğe bağlı giriş.
-  Başlıktan film/dizi adı ve sezon/bölüm çıkarılır.
-- **Telefondan kontrol**: Menü → Telefondan kontrol (QR). Apple TV'de `:8765` portunda küçük bir web sunucusu açılır (PIN'li);
-  telefondan adres/arama gönderme, seçili alana metin yazma, dokunmatik alanla imleç ve kaydırma, geri/ana sayfa/menü, oynat/duraklat.
-- **Sık kullanılanlar**: ekle, sil, yeniden adlandır, adresi düzenle, sırala
-- **Geçmiş**: listeleme, arama, temizleme
-- **Gizli gezinme**: geçmiş/oturum kaydedilmez; kapanınca (veya uygulama yeniden açılınca) çerezler girişteki hâline döner
-- Masaüstü/mobil site (gerçek kullanıcı ajanı iç `WebView` üzerinden ayarlanır), arama motoru, imleç hızı
+A dark background with violet → pink accents and glass (blur) surfaces. The layered (parallax) tvOS icon and the
+Top Shelf images are generated with `scripts/make-icons.py` (`python3 scripts/make-icons.py . preview.png`, requires Pillow).
+The same visual language is used on the home page (greeting, clock, favicon tiles), the auto-hiding floating top bar,
+the iPadOS-style cursor, the side menu panel, the tab switcher, the search screen, glass toasts and the phone remote page
+(`Pano/Theme.swift`, `Pano/MenuPanel.swift`, `Pano/TabSwitcherController.swift`, `Pano/SearchController.swift`).
 
-## Kumanda
+## Features
 
-| Hareket | İşlev |
+- **Tabs** (up to 8) with a full-screen tab switcher showing page previews; open links in a new tab; `window.open` popups
+  go to a background tab. Play/Pause closes the focused tab, holding select offers more actions.
+- **Session restore**: open tabs come back when the app is relaunched (tabs load on demand).
+- **Search screen**: tvOS's native search layout with live suggestions (go to address, search, favorites, history).
+- **Zoom**: scales the whole page (75–250%), remembered per site; plus a default zoom and text size.
+- **Ad/tracker blocking** (off by default for now, toggle in Settings): ~170 ad/tracking domains are blocked through a
+  `URLProtocol`, and empty ad slots are hidden with CSS.
+- **Smart cursor**: grows and slows down over clickable elements; sends mouse-over events so hover menus work.
+- **Reader mode**: shows the main text of an article on a large-type dark page.
+- **Video site players**: clicks are forwarded into cross-origin player iframes (the WebKit1 `WebFrame` API is not bound
+  by the same-origin policy). For ~12 s after a click, a video that starts playing or a `.m3u8`/`.mp4` requested over
+  the network is captured and opened in the tvOS player with the right Referer/Origin headers. The menu lists all
+  candidates under "Play video full screen". In-page media playback is disabled on purpose (see Stability).
+  Note: this engine has no `MediaSource`; players that only use MSE (blob:) streams or DRM are not supported.
+- **External subtitles**: when the player opens, the site's subtitles (`<track>`, cues loaded by the page's player,
+  `.vtt`/`.srt` files requested over the network, addresses found in player configs) are collected and drawn on top
+  of the video. A track in the app language is selected automatically; Windows-1254 SRTs are decoded correctly.
+  The player's top bar has subtitle selection, timing offset (±0.5 / ±2 s) and appearance (size, white/yellow,
+  box background). Embedded HLS subtitles in the app language are selected automatically.
+- **Resume playback**: the position is saved per page *and* video when the player closes (and every 10 s). When the same
+  video is opened again, a "Resume" button appears inside the player (matched by video address or duration, so other
+  videos on the same page are not affected). The home page has a "Continue watching" row with progress bars.
+- **Next episode**: finds the page's "next episode" link (or guesses it by incrementing the episode number in the
+  address); available in the player menu, as an on-screen button in the last 2 minutes and with a 10 s countdown at the
+  end. On the new page the player is found and clicked automatically.
+- **Source picker**: alternative player buttons ("Source 1 / Alternative / Dubbed / data-frame…") are listed in the menu
+  (only on pages that have a player).
+- **Player**: speed (0.75–2×), skip (10/15/30/60 s steps, "Skip intro +85 s").
+- **OpenSubtitles**: player → Subtitles → Find online. API key in Settings (opensubtitles.com/consumers), optional sign-in.
+  The movie/series name and season/episode are parsed from the page title; searches use the app language.
+- **Phone control**: Menu → Phone control (QR). A small PIN-protected web server runs on the Apple TV on port `8765`;
+  from the phone you can send addresses/searches, type into the selected field, move the cursor and scroll with a touch
+  pad, and use back/home/menu/play-pause.
+- **Find on page**: highlights all matches, step through them with ◀ ▶.
+- **Favorites**: add, delete, rename, edit the address, reorder.
+- **History**: list, search, clear.
+- **Private browsing**: no history/session is saved; on exit (or relaunch) cookies are restored to their earlier state.
+- Desktop/mobile sites (the real user agent is set on the inner `WebView`), search engine, cursor speed.
+
+## Stability and performance
+
+- **WebThread layout guard** (`Pano/LayoutGuard.swift`): legacy WebKit commits Core Animation transactions on its own
+  thread, which can lay out the whole window. Auto Layout views laid out off the main thread crash on recent tvOS, so
+  non-WebKit views defer such layout passes to the main thread.
+- In-page media playback is disabled (`mediaPlaybackRequiresUserAction`, `play()` only records a request); WebKit's own
+  video UI on tvOS could touch UIKit from the WebThread. `crossorigin` is stripped from media elements because a CORS
+  failure on such a video crashes the legacy engine.
+- JavaScript runs without a JIT on the device (an in-process web view cannot get the JIT entitlement), so script-heavy
+  sites are slower than on a computer; mobile site view helps. The shared `URLCache` is raised to 64 MB / 512 MB.
+
+## Remote
+
+| Action | Result |
 |---|---|
-| Dokunmatik yüzeyde kaydır | İmleci hareket ettir (kenara itince sayfa kayar) |
-| Tıkla | İmlecin altına tıkla; metin alanında klavye, açılır listede seçim, videoda tam ekran oynatıcı |
-| Seçim tuşuna basılı tut | Menü |
-| Oynat/Duraklat | İmleç ↔ kaydırma modu |
-| Oynat/Duraklat'a çift bas | Adres çubuğu |
-| Oynat/Duraklat'a basılı tut | Sekmeler |
-| Yön tuşları | Sayfayı kaydır (sayfada bul açıkken ◀ ▶ eşleşmeler arasında gezer) |
-| Menü / Geri | Bulma vurgusunu / okuma modunu kapat → önceki sayfa → ana sayfa → çıkış |
+| Swipe on the touch surface | Move the cursor (pushing it to the edge scrolls the page) |
+| Click | Click under the cursor; text fields open the keyboard, selects open a picker, videos open full screen |
+| Hold the select button | Menu |
+| Play/Pause | Cursor ↔ scroll mode |
+| Double-press Play/Pause | Address / search screen |
+| Hold Play/Pause | Tabs |
+| Arrow buttons | Scroll the page (◀ ▶ move between matches while finding) |
+| Menu / Back | Close find highlights / reader mode → previous page → home page → exit |
 
-## Debug başlatma argümanları (yalnızca DEBUG)
+## Debug launch arguments (DEBUG builds only)
 
-- `-openURL <adres>`: açılışta bu adresi aç
-- `-hasSeenHelp YES`: yardım penceresini atla
-- `-debugClickX <x> -debugClickY <y> [-debugType <metin>]`: 3 sn sonra o noktaya tıkla (ve metin alanına yazıp gönder)
-- `-debugAction <eylem> [-debugDelay <sn>]`: `remote`, `next`, `sources`, `subs`, `reader`, `find:kelime`, `zoom:150`, `menu`, `tabs`, `settings`, `newtab:<adres>`, `private`, `hover:x,y`, `play`, `ua`, `videos`, `blocked`
+- `-openURL <address>`: open this address at launch
+- `-hasSeenHelp YES`: skip the help dialog
+- `-debugClickX <x> -debugClickY <y> [-debugType <text>]`: click that point after 3 s (and type/submit into the field)
+- `-debugAction <action> [-debugDelay <s>]`: `remote`, `next`, `sources`, `subs`, `reader`, `find:word`, `zoom:150`,
+  `menu`, `tabs`, `settings`, `newtab:<address>`, `private`, `hover:x,y`, `play`, `ua`, `videos`, `blocked`,
+  `jsbench`, `closefocused`
+- Debug builds also expose `GET http://<apple-tv>:8765/debug/{jsbench,open?url=,perf}` for on-device measurements.
