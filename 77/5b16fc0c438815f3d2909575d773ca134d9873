@@ -1,0 +1,23 @@
+Pano/Localizable.xcstrings
+  s_5baf93b1090e54::t_4cf6dcc4dda372 9559-9623,11704,11710,11716,11722,11728,11734,11740,11746,11752,11758,11764,14304-14365
+  s_5baf93b1090e54::t_8b7a70647f3c06 14366-14368
+Pano/VideoPlayerController.swift
+  s_5baf93b1090e54::t_65655fe84e8ff5 302-303,305-306,310-311,313,358-366,465-466,472-477,482-483
+  s_5baf93b1090e54::t_e18e2aa1ecd37f 301
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "775b16fc0c438815f3d2909575d773ca134d9873",
+  "prompts": {},
+  "sessions": {
+    "s_5baf93b1090e54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "601d29e4-ba43-4522-885f-d93753211e45",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Ferhan Akkan"
+    }
+  }
+}
