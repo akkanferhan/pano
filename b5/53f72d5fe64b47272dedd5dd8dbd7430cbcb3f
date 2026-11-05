@@ -1,0 +1,27 @@
+Pano/BrowserViewController+Menus.swift
+  s_3f41b1e7e08a3b::t_dce2048d4220f4 385
+Pano/BrowserViewController.swift
+  s_3f41b1e7e08a3b::t_8f395c5cfeee23 618,630
+Pano/Localizable.xcstrings
+  s_3f41b1e7e08a3b::t_2630980c24af67 6959-7023,18011
+Pano/Pages.swift
+  s_3f41b1e7e08a3b::t_c7830d96e9b188 132
+README.md
+  s_3f41b1e7e08a3b::t_fbd7ead663ff41 98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b553f72d5fe64b47272dedd5dd8dbd7430cbcb3f",
+  "prompts": {},
+  "sessions": {
+    "s_3f41b1e7e08a3b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a5fe27a-d5c6-429c-8f61-56f6b01fa736",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Ferhan Akkan"
+    }
+  }
+}
