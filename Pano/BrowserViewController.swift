@@ -31,8 +31,6 @@ final class BrowserViewController: UIViewController {
     private var velocity: CGPoint = .zero
     private var smoothLink: CADisplayLink?
     private var smoothTarget: CGPoint?
-    private var selectHold: DispatchWorkItem?
-    private var selectHoldFired = false
     private var playHold: DispatchWorkItem?
     private var playHoldFired = false
     private var hovering = false
@@ -609,15 +607,6 @@ final class BrowserViewController: UIViewController {
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         guard let press = presses.first else { return super.pressesBegan(presses, with: event) }
         switch press.type {
-        case .select:
-            selectHoldFired = false
-            let work = DispatchWorkItem { [weak self] in
-                guard let self else { return }
-                self.selectHoldFired = true
-                self.setMode(self.mode == .cursor ? .scroll : .cursor)
-            }
-            selectHold = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
         case .playPause:
             playHoldFired = false
             let work = DispatchWorkItem { [weak self] in
@@ -626,7 +615,7 @@ final class BrowserViewController: UIViewController {
             }
             playHold = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
-        case .menu, .upArrow, .downArrow, .leftArrow, .rightArrow:
+        case .select, .menu, .upArrow, .downArrow, .leftArrow, .rightArrow:
             break // pressesEnded'de işlenir
         default:
             super.pressesBegan(presses, with: event)
@@ -638,8 +627,7 @@ final class BrowserViewController: UIViewController {
         let page = (engine?.scrollView?.bounds.height ?? 800) * 0.6
         switch press.type {
         case .select:
-            selectHold?.cancel()
-            if selectHoldFired { return }
+            // İmleç ↔ kaydırma modu yalnızca adres çubuğundaki mod rozetinden değişir.
             if mode == .scroll { setMode(.cursor) } else { clickAtCursor() }
         case .playPause:
             playHold?.cancel()
@@ -659,7 +647,6 @@ final class BrowserViewController: UIViewController {
     }
 
     override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        selectHold?.cancel()
         playHold?.cancel()
         super.pressesCancelled(presses, with: event)
     }

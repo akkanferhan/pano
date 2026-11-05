@@ -95,7 +95,7 @@ and let the app handle the rest — typing, scrolling, video, subtitles and tabs
 | Click | Click; text fields open the search keyboard, players open the video full screen |
 | **Play/Pause** | Open or close the menu |
 | Hold Play/Pause | Tabs |
-| Hold select | Switch between cursor and scroll mode |
+| Mode badge in the address bar | Switch between cursor and scroll mode (in scroll mode, a click returns to the cursor) |
 | Arrow buttons | Scroll the page (◀ ▶ jump between matches when finding) |
 | Menu / Back | Close find or reader mode → back → home → exit |
 
