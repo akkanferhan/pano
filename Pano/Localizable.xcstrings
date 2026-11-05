@@ -2601,71 +2601,6 @@
         }
       }
     },
-    "Continue from %@?": {
-      "extractionState": "manual",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "المتابعة من %@؟"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ab %@ fortsetzen?"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "¿Continuar desde %@?"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reprendre à partir de %@ ?"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ से जारी रखें?"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@から続けますか？"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuar de %@?"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Продолжить с %@?"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ noktasından devam edilsin mi?"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "从 %@ 继续？"
-          }
-        }
-      }
-    },
     "Continue watching": {
       "extractionState": "manual",
       "localizations": {
@@ -9621,6 +9556,71 @@
         }
       }
     },
+    "Opening the video…": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "جارٍ فتح الفيديو…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video wird geöffnet …"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abriendo el vídeo…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouverture de la vidéo…"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "वीडियो खोला जा रहा है…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ビデオを開いています…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrindo o vídeo…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открытие видео…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video açılıyor…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在打开视频…"
+          }
+        }
+      }
+    },
     "PIN": {
       "extractionState": "manual",
       "localizations": {
@@ -11701,67 +11701,67 @@
         }
       }
     },
-    "Resume · %@": {
+    "Resuming from %@": {
       "extractionState": "manual",
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "استئناف · %@"
+            "value": "الاستئناف من %@"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fortsetzen · %@"
+            "value": "Fortsetzen ab %@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reanudar · %@"
+            "value": "Reanudando desde %@"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reprendre · %@"
+            "value": "Reprise à %@"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "फिर से शुरू करें · %@"
+            "value": "%@ से फिर से शुरू हो रहा है"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "再開 · %@"
+            "value": "%@ から再開します"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Retomar · %@"
+            "value": "Retomando de %@"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Продолжить · %@"
+            "value": "Продолжение с %@"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Devam et · %@"
+            "value": "%@ noktasından devam ediliyor"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "继续 · %@"
+            "value": "从 %@ 继续播放"
           }
         }
       }
@@ -14297,6 +14297,71 @@
           "stringUnit": {
             "state": "translated",
             "value": "速度：%g×"
+          }
+        }
+      }
+    },
+    "Start over": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "البدء من جديد"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Von vorne"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empezar de nuevo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recommencer"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "शुरू से देखें"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最初から"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Começar do início"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сначала"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baştan başla"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从头开始"
           }
         }
       }

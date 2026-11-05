@@ -110,7 +110,7 @@ enum Pages {
             let time = pos >= 3600 ? String(format: "%d:%02d:%02d", pos / 3600, pos / 60 % 60, pos % 60)
                 : String(format: "%d:%02d", pos / 60, pos % 60)
             return """
-            <a class="cw" href="\(esc(w.pageURL))"><div class="play"></div><b>\(esc(w.title))</b>\
+            <a class="cw" href="pano://resume?url=\(esc(w.pageURL.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? w.pageURL))"><div class="play"></div><b>\(esc(w.title))</b>\
             <span>\(esc(host)) · \(esc(L("Resume at %@", time)))</span><div class="bar"><i style="width:\(pct)%"></i></div></a>
             """
         }.joined()

@@ -281,6 +281,14 @@ final class BrowserViewController: UIViewController {
             case "search":
                 let q = items.first { $0.name == "q" }?.value ?? ""
                 DispatchQueue.main.async { self.open(q, in: t) }
+            case "resume": // "İzlemeye devam" kartı: sayfayı aç, oynatıcıyı otomatik başlat (oynatıcı kaldığı yere atlar)
+                if let s = items.first(where: { $0.name == "url" })?.value, let target = URL(string: s) {
+                    DispatchQueue.main.async {
+                        t.autoPlayPending = true
+                        t.engine.load(target)
+                        self.showToast(L("Opening the video…"), symbol: "play.rectangle.fill")
+                    }
+                }
             case "newtab":
                 if let s = items.first(where: { $0.name == "url" })?.value, let target = URL(string: s) {
                     DispatchQueue.main.async {
