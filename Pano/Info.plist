@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>tr</string>
+	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>Pano</string>
 	<key>CFBundleExecutable</key>
@@ -27,6 +27,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Telefonundan Pano’yu kontrol edebilmen için (adres gönderme, metin yazma, imleç) yerel ağda küçük bir sunucu açılır.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
