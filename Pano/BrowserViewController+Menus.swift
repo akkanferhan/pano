@@ -382,7 +382,7 @@ extension BrowserViewController {
             L("Click: click · keyboard in text fields · clicking a player opens the video full screen"),
             L("Play/Pause: menu"),
             L("Hold Play/Pause: tabs"),
-            L("Hold the select button: cursor ↔ scroll mode"),
+            L("Mode badge in the address bar: cursor ↔ scroll mode"),
             L("Arrow buttons: scroll the page (◀ ▶ jump between matches when finding)"),
             L("Menu / Back: previous page"),
             L("In a video (swipe down): Subtitles · Speed · Skip · Next episode"),

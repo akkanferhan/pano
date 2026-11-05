@@ -6111,71 +6111,6 @@
         }
       }
     },
-    "Hold the select button: cursor ↔ scroll mode": {
-      "extractionState": "manual",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "اضغط مطولًا على زر التحديد: المؤشر ↔ وضع التمرير"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Auswahltaste gedrückt halten: Zeiger ↔ Scrollmodus"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mantén pulsado el botón de selección: cursor ↔ modo desplazamiento"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Maintiens le bouton de sélection : curseur ↔ mode défilement"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "चयन बटन दबाए रखें: कर्सर ↔ स्क्रॉल मोड"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "選択ボタンを長押し：カーソル ↔ スクロールモード"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mantenha pressionado o botão de seleção: cursor ↔ modo de rolagem"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Удерживайте кнопку выбора: курсор ↔ режим прокрутки"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Seçim tuşuna basılı tut: imleç ↔ kaydırma modu"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "按住选择键：光标 ↔ 滚动模式"
-          }
-        }
-      }
-    },
     "Home": {
       "extractionState": "manual",
       "localizations": {
@@ -7017,6 +6952,71 @@
           "stringUnit": {
             "state": "translated",
             "value": "移动版网站"
+          }
+        }
+      }
+    },
+    "Mode badge in the address bar: cursor ↔ scroll mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "شارة الوضع في شريط العنوان: المؤشر ↔ وضع التمرير"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modus-Badge in der Adressleiste: Zeiger ↔ Scrollmodus"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indicador de modo en la barra de direcciones: cursor ↔ modo desplazamiento"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Badge de mode dans la barre d’adresse : curseur ↔ mode défilement"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "एड्रेस बार में मोड बैज: कर्सर ↔ स्क्रॉल मोड"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アドレスバーのモードバッジ：カーソル ↔ スクロールモード"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selo de modo na barra de endereço: cursor ↔ modo de rolagem"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Значок режима в адресной строке: курсор ↔ режим прокрутки"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adres çubuğundaki mod rozeti: imleç ↔ kaydırma modu"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地址栏中的模式标记：光标 ↔ 滚动模式"
           }
         }
       }

@@ -129,7 +129,7 @@ enum Pages {
         \(watchingSection)
         <h2>\(esc(L("Favorites")))</h2>
         <div class="row">\(tiles.isEmpty ? "<div class=\"empty\">\(esc(L("No favorites yet — add one from the menu while on a site.")))</div>" : tiles)</div>
-        <div class="hints"><span><b>\(esc(L("Play")))</b>\(esc(L("Menu")))</span><span><b>\(esc(L("Play hold")))</b>\(esc(L("Tabs")))</span><span><b>\(esc(L("Hold")))</b>\(esc(L("Cursor / scroll")))</span><span><b>\(esc(L("Menu")))</b>\(esc(L("Back")))</span></div>
+        <div class="hints"><span><b>\(esc(L("Play")))</b>\(esc(L("Menu")))</span><span><b>\(esc(L("Play hold")))</b>\(esc(L("Tabs")))</span><span><b>\(esc(L("Menu")))</b>\(esc(L("Back")))</span></div>
         <script>
         (function(){
           var lang = \(jsString(AppLanguage.current));
