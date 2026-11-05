@@ -219,6 +219,17 @@ final class ChromeBar: UIView {
         setLoading(loading)
     }
 
+    enum Region { case tabs, mode, privateMode, address }
+
+    /// Çubuk üzerindeki bir noktanın hangi bölgeye denk geldiği (imleçle tıklama için; çubuk koordinatlarında).
+    func region(at point: CGPoint) -> Region {
+        func hit(_ v: UIView) -> Bool { !v.isHidden && v.frame.insetBy(dx: -10, dy: -14).contains(point) }
+        if hit(tabsBadge) { return .tabs }
+        if hit(modeBadge) { return .mode }
+        if hit(privateBadge) { return .privateMode }
+        return .address
+    }
+
     func setLoading(_ loading: Bool) {
         if loading { spinner.startAnimating() } else { spinner.stopAnimating() }
         icon.isHidden = loading
@@ -229,7 +240,7 @@ final class ChromeBar: UIView {
                                                symbol: cursorMode ? "cursorarrow" : "arrow.up.and.down", size: 19)
         modeBadge.backgroundColor = cursorMode ? Theme.violet.withAlphaComponent(0.85) : Theme.teal.withAlphaComponent(0.85)
         tabsBadge.attributedText = Theme.label("\(tabCount)", symbol: "square.on.square", size: 19)
-        tabsBadge.isHidden = tabCount < 2
+        tabsBadge.isHidden = false
         privateBadge.isHidden = !isPrivate
         setNeedsLayout()
     }

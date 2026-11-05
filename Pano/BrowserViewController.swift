@@ -211,6 +211,7 @@ final class BrowserViewController: UIViewController {
     func activate(_ index: Int) {
         guard tabs.indices.contains(index) else { return }
         resetFind()
+        if let old = activeTab, old.engine.view.window != nil { old.snapshot = snapshot(of: old) }
         activeTab?.engine.view.removeFromSuperview()
         current = index
         let t = tabs[index]
@@ -486,7 +487,8 @@ final class BrowserViewController: UIViewController {
 
     func checkHover() {
         guard mode == .cursor, let e = engine, let p = pointer() else { return }
-        let h = e.js(Pages.hover(p)) == "1"
+        let overChrome = chromeShown && chrome.alpha > 0.5 && chrome.frame.contains(cursor.center)
+        let h = overChrome || e.js(Pages.hover(p)) == "1"
         guard h != hovering else { return }
         hovering = h
         cursor.setHovering(h)
@@ -643,6 +645,16 @@ final class BrowserViewController: UIViewController {
     // MARK: Tıklama ve form alanları
 
     func clickAtCursor() {
+        if chromeShown, chrome.alpha > 0.5, chrome.frame.contains(cursor.center) {
+            bounceCursor()
+            switch chrome.region(at: view.convert(cursor.center, to: chrome)) {
+            case .tabs: showTabSwitcher()
+            case .mode: setMode(mode == .cursor ? .scroll : .cursor)
+            case .privateMode: showToast("Gizli gezinme açık — menüden kapatabilirsin", symbol: "eye.slash.fill")
+            case .address: askAddress()
+            }
+            return
+        }
         guard let e = engine, let p = pointer() else { return }
         bounceCursor()
         stopVideoWatch()
@@ -709,15 +721,55 @@ final class BrowserViewController: UIViewController {
 
     private func chooseOption(options: [String], selected: Int, label: String) {
         guard !options.isEmpty else { return }
-        let sheet = UIAlertController(title: label.isEmpty ? "Seç" : label, message: nil, preferredStyle: .actionSheet)
+        let panel = MenuPanelController(title: label.isEmpty ? "Seç" : label, subtitle: "\(options.count) seçenek")
         for (i, option) in options.enumerated() {
-            sheet.addAction(UIAlertAction(title: (i == selected ? "✓ " : "") + option, style: .default) { [weak self] _ in
+            panel.addItem(option, checked: i == selected) { [weak self] in
                 guard let self else { return }
                 self.engine?.evaluate(Pages.setSelectIndex(i), in: self.fieldFrame)
-            })
+            }
         }
-        sheet.addAction(UIAlertAction(title: "Vazgeç", style: .cancel))
-        present(sheet, animated: true)
+        present(panel, animated: false)
+    }
+
+    // MARK: Sekme ekranı
+
+    /// Sekmenin web görünümünden küçük bir anlık görüntü.
+    func snapshot(of t: Tab) -> UIImage? {
+        let v = t.engine.view
+        guard v.bounds.width > 0 else { return t.snapshot }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 0.5
+        return UIGraphicsImageRenderer(bounds: v.bounds, format: format).image { _ in
+            v.drawHierarchy(in: v.bounds, afterScreenUpdates: false)
+        }
+    }
+
+    private func tabCards() -> [TabSwitcherController.Card] {
+        tabs.enumerated().map { i, t in
+            let url = t.url ?? t.pendingURL
+            let host = t.isHome ? "Ana sayfa" : ((url?.host ?? "").replacingOccurrences(of: "www.", with: ""))
+            return TabSwitcherController.Card(title: t.title, host: host, image: t.snapshot, isCurrent: i == current,
+                                              isPrivate: store.privateMode)
+        }
+    }
+
+    func showTabSwitcher() {
+        guard presentedViewController == nil else { return }
+        if let t = activeTab { t.snapshot = snapshot(of: t) }
+        let vc = TabSwitcherController()
+        vc.modalPresentationStyle = .overFullScreen
+        vc.cards = tabCards()
+        vc.onSelect = { [weak self] i in
+            guard let self else { return }
+            if i != self.current { self.activate(i) }
+        }
+        vc.onNewTab = { [weak self] in self?.addTab(url: nil, activate: true) }
+        vc.onClose = { [weak self] i in
+            guard let self else { return [] }
+            self.closeTab(i)
+            return self.tabCards()
+        }
+        present(vc, animated: true)
     }
 
     func linkAtCursor() -> URL? {
@@ -1084,7 +1136,7 @@ final class BrowserViewController: UIViewController {
 
     /// Bildirim metnine uygun SF Symbol.
     private static func toastSymbol(for text: String) -> String? {
-        let t = text.lowercased()
+        let t = text.lowercased(with: Locale(identifier: "tr_TR"))
         let table: [(String, String)] = [
             ("sık kullanılan", "star.fill"), ("sekme", "square.on.square"), ("video", "play.rectangle.fill"),
             ("altyazı", "captions.bubble.fill"), ("gizli", "eye.slash.fill"), ("reklam", "shield.lefthalf.filled"),
