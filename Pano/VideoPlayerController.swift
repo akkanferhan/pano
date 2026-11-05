@@ -21,7 +21,7 @@ final class VideoPlayerController: AVPlayerViewController {
 
     private let store = Store.shared
     private let subtitleLabel = UILabel()
-    private let countdownLabel = PaddedLabel()
+    private let countdownLabel = GlassCapsule(text: " ", symbol: "forward.end.fill", size: 30)
     private var sources: [SubtitleSource] = []
     private var userAgent = ""
     private var context = PlaybackContext(pageURL: nil, title: "")
@@ -115,11 +115,6 @@ final class VideoPlayerController: AVPlayerViewController {
             subtitleLabel.widthAnchor.constraint(lessThanOrEqualTo: overlay.widthAnchor, multiplier: 0.82),
             subtitleLabel.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -70),
         ])
-        countdownLabel.font = .systemFont(ofSize: 32, weight: .semibold)
-        countdownLabel.textColor = .white
-        countdownLabel.backgroundColor = UIColor(white: 0, alpha: 0.75)
-        countdownLabel.layer.cornerRadius = 16
-        countdownLabel.layer.masksToBounds = true
         countdownLabel.isHidden = true
         overlay.addSubview(countdownLabel)
     }
@@ -289,11 +284,8 @@ final class VideoPlayerController: AVPlayerViewController {
         countdownLabel.isHidden = false
         let update = { [weak self] in
             guard let self, let overlay = self.contentOverlayView else { return }
-            self.countdownLabel.text = "Sonraki bölüm \(remaining) sn içinde başlıyor · iptal: Menü"
-            let size = self.countdownLabel.sizeThatFits(CGSize(width: 1200, height: 200))
-            self.countdownLabel.frame = CGRect(x: overlay.bounds.width - size.width - 80,
-                                               y: 150,
-                                               width: size.width, height: size.height)
+            self.countdownLabel.setText("Sonraki bölüm \(remaining) sn içinde · iptal: Menü", symbol: "forward.end.fill", size: 30)
+            self.countdownLabel.frame.origin = CGPoint(x: overlay.bounds.width - self.countdownLabel.frame.width - 80, y: 150)
         }
         update()
         countdown?.invalidate()
@@ -442,21 +434,21 @@ final class VideoPlayerController: AVPlayerViewController {
         present(a, animated: true)
     }
 
-    /// Kısa bilgi yazısı (sağ üstte, 2 sn).
+    /// Kısa bilgi (sağ üstte cam kapsül, 2 sn).
     private func flash(_ text: String) {
         guard let overlay = contentOverlayView else { return }
-        let label = PaddedLabel()
-        label.text = text
-        label.font = .systemFont(ofSize: 28, weight: .semibold)
-        label.textColor = .white
-        label.backgroundColor = UIColor(white: 0, alpha: 0.7)
-        label.layer.cornerRadius = 14
-        label.layer.masksToBounds = true
-        let size = label.sizeThatFits(CGSize(width: 900, height: 200))
-        label.frame = CGRect(x: overlay.bounds.width - size.width - 80, y: 70, width: size.width, height: size.height)
-        overlay.addSubview(label)
-        UIView.animate(withDuration: 0.3, delay: 2, options: [], animations: { label.alpha = 0 }) { _ in
-            label.removeFromSuperview()
+        let t = text.lowercased()
+        let symbol = t.contains("altyazı") ? "captions.bubble.fill" : t.contains("hız") ? "speedometer"
+            : t.contains("indir") || t.contains("aran") ? "magnifyingglass" : t.hasPrefix("+") ? "goforward"
+            : t.hasPrefix("−") ? "gobackward" : "info.circle.fill"
+        let capsule = GlassCapsule(text: text, symbol: symbol)
+        capsule.frame.origin = CGPoint(x: overlay.bounds.width - capsule.frame.width - 80, y: 70)
+        capsule.alpha = 0
+        overlay.addSubview(capsule)
+        UIView.animate(withDuration: 0.25, animations: { capsule.alpha = 1 }) { _ in
+            UIView.animate(withDuration: 0.35, delay: 1.8, options: [], animations: { capsule.alpha = 0 }) { _ in
+                capsule.removeFromSuperview()
+            }
         }
     }
 }

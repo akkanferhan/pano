@@ -28,67 +28,119 @@ enum Pages {
 
     // MARK: Ana sayfa / hata
 
+    /// Ortak tema: koyu zemin, mor/mavi/pembe ışık lekeleri, cam yüzeyler.
     private static let style = """
     <style>
     *{box-sizing:border-box}
-    html,body{margin:0;background:#0d0f14;color:#eef1f7;font-family:-apple-system,Helvetica,sans-serif}
-    body{padding:70px 110px}
-    h1{font-size:64px;font-weight:700;margin:0 0 8px;letter-spacing:-1px}
-    .sub{color:#8a93a6;font-size:24px;margin-bottom:44px}
-    form{margin-bottom:56px}
-    input{width:100%;font-size:34px;padding:24px 30px;border-radius:20px;border:2px solid #2a3040;background:#171b24;color:#fff;outline:none}
-    h2{font-size:28px;color:#8a93a6;font-weight:600;margin:0 0 20px}
-    .grid{display:flex;flex-wrap:wrap;gap:26px}
-    a.tile{display:flex;flex-direction:column;justify-content:flex-end;width:300px;height:170px;padding:22px;border-radius:22px;text-decoration:none;color:#fff;background:linear-gradient(135deg,var(--a),var(--b));}
-    a.tile b{font-size:30px;line-height:38px}
-    a.tile span{font-size:18px;line-height:26px;opacity:.75;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .letter{font-size:56px;font-weight:800;opacity:.9;flex:1}
-    .private{display:inline-block;background:#5b2bd6;color:#fff;font-size:22px;padding:6px 16px;border-radius:12px;margin-left:16px;vertical-align:middle}
-    .cwgrid{margin-bottom:50px}
-    a.cw{position:relative;display:flex;flex-direction:column;justify-content:center;width:470px;height:120px;padding:18px 24px;border-radius:18px;background:#1a1f2b;color:#fff;text-decoration:none;overflow:hidden}
-    a.cw b{font-size:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    a.cw span{font-size:18px;color:#8a93a6;margin-top:6px}
-    a.cw i{position:absolute;left:0;bottom:0;height:6px;background:#e50914}
-    .err{max-width:1200px}
-    .err p{font-size:28px;color:#aab2c4}
+    html{background:#07070f}
+    html,body{margin:0;min-height:100%;color:#f4f5fa;font-family:-apple-system,"SF Pro Display",Helvetica,sans-serif;-webkit-font-smoothing:antialiased}
+    body{padding:96px 120px 90px;position:relative;overflow-x:hidden;background:transparent}
+    .bg{position:fixed;top:0;left:0;right:0;bottom:0;z-index:-1;background:
+      radial-gradient(1000px 760px at 6% -4%, rgba(124,58,237,.60), rgba(124,58,237,0) 70%),
+      radial-gradient(900px 760px at 102% 104%, rgba(236,72,153,.42), rgba(236,72,153,0) 70%),
+      radial-gradient(760px 520px at 62% -12%, rgba(59,130,246,.38), rgba(59,130,246,0) 70%),
+      radial-gradient(700px 560px at -4% 104%, rgba(20,184,166,.22), rgba(20,184,166,0) 70%), #07070f}
+    header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:46px}
+    .hello{font-size:68px;font-weight:800;letter-spacing:-1.5px;line-height:1.05}
+    .date{font-size:26px;color:rgba(255,255,255,.55);margin-top:10px;font-weight:500}
+    .clock{font-size:84px;font-weight:200;letter-spacing:-2px;color:rgba(255,255,255,.92);font-variant-numeric:tabular-nums}
+    .brand{display:inline-flex;align-items:center;gap:14px;font-size:24px;font-weight:700;color:rgba(255,255,255,.85);margin-bottom:22px}
+    .logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(124,58,237,.45)}
+    .logo b{width:16px;height:16px;border-radius:50%;background:#fff}
+    .pill{display:inline-block;margin-left:14px;padding:6px 16px;border-radius:999px;background:rgba(124,58,237,.85);font-size:20px;font-weight:700;vertical-align:middle}
+    form{margin:0 0 64px}
+    .search{position:relative}
+    .search svg{position:absolute;left:38px;top:50%;margin-top:-17px;width:34px;height:34px;opacity:.6;z-index:2}
+    input{width:100%;font-size:34px;padding:30px 36px 30px 94px;border-radius:999px;border:1.5px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.08);-webkit-backdrop-filter:blur(30px);color:#fff;outline:none;font-family:inherit;
+      box-shadow:0 20px 60px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.12)}
+    input::-webkit-input-placeholder{color:rgba(255,255,255,.45)}
+    h2{font-size:30px;font-weight:700;margin:0 0 24px;color:rgba(255,255,255,.9);letter-spacing:-.3px}
+    .row{display:flex;flex-wrap:wrap;gap:28px;margin-bottom:60px}
+    a.cw{position:relative;display:flex;flex-direction:column;justify-content:flex-end;width:520px;height:190px;padding:26px 30px;border-radius:28px;
+      text-decoration:none;color:#fff;overflow:hidden;background:linear-gradient(135deg,rgba(124,58,237,.55),rgba(236,72,153,.35));
+      border:1.5px solid rgba(255,255,255,.14);box-shadow:0 20px 50px rgba(0,0,0,.35)}
+    a.cw .play{position:absolute;right:26px;top:24px;width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.95);display:flex;align-items:center;justify-content:center}
+    a.cw .play:after{content:"";margin-left:5px;border-left:18px solid #7c3aed;border-top:11px solid transparent;border-bottom:11px solid transparent}
+    a.cw b{font-size:28px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:70px}
+    a.cw span{font-size:19px;color:rgba(255,255,255,.7);margin-top:6px}
+    a.cw .bar{position:absolute;left:0;right:0;bottom:0;height:7px;background:rgba(255,255,255,.18)}
+    a.cw .bar i{display:block;height:100%;background:linear-gradient(90deg,#a78bfa,#f472b6)}
+    a.tile{width:236px;text-decoration:none;color:#fff;text-align:center}
+    a.tile .ic{width:236px;height:180px;border-radius:30px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;
+      background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);box-shadow:0 18px 44px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.1)}
+    a.tile .ic:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 20%,var(--g),transparent 70%);opacity:.55}
+    a.tile img{position:relative;width:84px;height:84px;border-radius:22px;background:#fff;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+    a.tile .lt{position:relative;width:84px;height:84px;border-radius:22px;background:linear-gradient(135deg,var(--g),rgba(255,255,255,.15));
+      display:none;align-items:center;justify-content:center;font-size:44px;font-weight:800}
+    a.tile .t{display:block;font-size:24px;font-weight:600;margin-top:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    a.tile .h{display:block;font-size:17px;color:rgba(255,255,255,.45);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .empty{font-size:24px;color:rgba(255,255,255,.5)}
+    .hints{display:flex;gap:34px;flex-wrap:wrap;color:rgba(255,255,255,.45);font-size:20px;margin-top:10px}
+    .hints span b{display:inline-block;padding:4px 12px;margin-right:10px;border-radius:10px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);font-weight:600}
+    .err{max-width:1300px;margin-top:80px}
+    .err .icon{width:110px;height:110px;border-radius:32px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;font-size:62px;font-weight:800;margin-bottom:40px;box-shadow:0 20px 50px rgba(124,58,237,.4)}
+    .err h1{font-size:64px;font-weight:800;letter-spacing:-1px;margin:0 0 20px}
+    .err p{font-size:28px;color:rgba(255,255,255,.65);margin:10px 0;line-height:1.45;word-break:break-all}
+    .err .url{display:inline-block;padding:12px 22px;border-radius:16px;background:rgba(255,255,255,.08);font-size:24px;color:rgba(255,255,255,.8)}
     </style>
     """
 
-    private static let palettes = [
-        ("#4f6bff", "#8a4fff"), ("#ff5f6d", "#ffc371"), ("#11998e", "#38ef7d"),
-        ("#fc466b", "#3f5efb"), ("#f7971e", "#ffd200"), ("#00b4db", "#0083b0"),
-        ("#8e2de2", "#4a00e0"), ("#e65c00", "#f9d423"),
-    ]
+    private static let glows = ["#7c3aed", "#ec4899", "#3b82f6", "#14b8a6", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"]
+
+    private static let searchIcon = """
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><path d="M20 20l-4.3-4.3"/></svg>
+    """
 
     static func home(bookmarks: [Bookmark], engine: SearchEngine, isPrivate: Bool, continueWatching: [WatchProgress] = []) -> String {
         let tiles = bookmarks.enumerated().map { i, b -> String in
-            let p = palettes[i % palettes.count]
             let host = URL(string: b.url)?.host ?? b.url
             let letter = b.title.first.map { String($0).uppercased() } ?? "•"
+            let favicon = "https://www.google.com/s2/favicons?domain=\(host)&sz=128"
             return """
-            <a class="tile" style="--a:\(p.0);--b:\(p.1)" href="\(esc(b.url))"><div class="letter">\(esc(letter))</div><b>\(esc(b.title))</b><span>\(esc(host))</span></a>
+            <a class="tile" href="\(esc(b.url))" style="--g:\(glows[i % glows.count])"><div class="ic">\
+            <img src="\(esc(favicon))" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><div class="lt">\(esc(letter))</div>\
+            </div><span class="t">\(esc(b.title))</span><span class="h">\(esc(host.replacingOccurrences(of: "www.", with: "")))</span></a>
             """
         }.joined()
-        let watching = continueWatching.prefix(8).map { w -> String in
-            let host = URL(string: w.pageURL)?.host ?? ""
-            let pct = w.duration > 0 ? min(100, Int(w.position / w.duration * 100)) : 0
-            let mins = Int(w.position) / 60, secs = Int(w.position) % 60
+        let watching = continueWatching.prefix(6).map { w -> String in
+            let host = (URL(string: w.pageURL)?.host ?? "").replacingOccurrences(of: "www.", with: "")
+            let pct = w.duration > 0 ? min(100, max(3, Int(w.position / w.duration * 100))) : 3
+            let pos = Int(w.position)
+            let time = pos >= 3600 ? String(format: "%d:%02d:%02d", pos / 3600, pos / 60 % 60, pos % 60)
+                : String(format: "%d:%02d", pos / 60, pos % 60)
             return """
-            <a class="cw" href="\(esc(w.pageURL))"><b>\(esc(w.title))</b><span>\(esc(host)) · \(mins):\(String(format: "%02d", secs))'den devam</span><i style="width:\(pct)%"></i></a>
+            <a class="cw" href="\(esc(w.pageURL))"><div class="play"></div><b>\(esc(w.title))</b>\
+            <span>\(esc(host)) · \(time)'den devam</span><div class="bar"><i style="width:\(pct)%"></i></div></a>
             """
         }.joined()
-        let watchingSection = watching.isEmpty ? "" : "<h2>İzlemeye devam</h2><div class=\"grid cwgrid\">\(watching)</div>"
+        let watchingSection = watching.isEmpty ? "" : "<h2>İzlemeye devam</h2><div class=\"row\">\(watching)</div>"
+        let privatePill = isPrivate ? "<span class=\"pill\">Gizli gezinme</span>" : ""
         return """
         <!doctype html><html data-pano="home"><head><meta charset="utf-8"><meta name="viewport" content="width=1600">
-        <title>Ana Sayfa</title>\(style)</head><body>
-        <h1>Pano\(isPrivate ? "<span class=\"private\">Gizli gezinme</span>" : "")</h1>
-        <div class="sub">\(isPrivate ? "Geçmiş kaydedilmiyor; gizli moddan çıkınca çerezler eski hâline döner." : "Apple TV için kişisel tarayıcı")</div>
-        <form action="pano://search" method="get">
-        <input type="search" name="q" placeholder="\(esc(engine.name)) ile ara veya adres yaz">
-        </form>
+        <title>Ana Sayfa</title>\(style)</head><body><div class="bg"></div>
+        <header><div><div class="brand"><div class="logo"><b></b></div>Pano\(privatePill)</div>
+        <div class="hello" id="hello">Merhaba</div><div class="date" id="date"></div></div>
+        <div class="clock" id="clock"></div></header>
+        <form action="pano://search" method="get"><div class="search">\(searchIcon)
+        <input type="search" name="q" placeholder="\(esc(engine.name)) ile ara veya adres yaz"></div></form>
         \(watchingSection)
         <h2>Sık Kullanılanlar</h2>
-        <div class="grid">\(tiles.isEmpty ? "<div class=\"sub\">Henüz sık kullanılan yok. Bir sitedeyken menüden ekleyebilirsin.</div>" : tiles)</div>
+        <div class="row">\(tiles.isEmpty ? "<div class=\"empty\">Henüz sık kullanılan yok — bir sitedeyken menüden ekleyebilirsin.</div>" : tiles)</div>
+        <div class="hints"><span><b>Basılı tut</b>Menü</span><span><b>Oynat ×2</b>Adres</span><span><b>Oynat basılı</b>Sekmeler</span><span><b>Oynat</b>İmleç / kaydırma</span><span><b>Menü</b>Geri</span></div>
+        <script>
+        (function(){
+          var days = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+          var months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+          function tick(){
+            var d = new Date(), h = d.getHours();
+            document.getElementById('hello').textContent = h < 5 ? 'İyi geceler' : h < 12 ? 'Günaydın' : h < 18 ? 'İyi günler' : h < 22 ? 'İyi akşamlar' : 'İyi geceler';
+            document.getElementById('date').textContent = d.getDate() + ' ' + months[d.getMonth()] + ' ' + days[d.getDay()];
+            document.getElementById('clock').textContent = ('0'+h).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+          }
+          tick(); setInterval(tick, 15000);
+        })();
+        </script>
         </body></html>
         """
     }
@@ -96,11 +148,12 @@ enum Pages {
     static func error(url: String, message: String) -> String {
         """
         <!doctype html><html data-pano="error"><head><meta charset="utf-8"><meta name="viewport" content="width=1600">
-        <title>Sayfa açılamadı</title>\(style)</head><body><div class="err">
+        <title>Sayfa açılamadı</title>\(style)</head><body><div class="bg"></div><div class="err">
+        <div class="icon">!</div>
         <h1>Sayfa açılamadı</h1>
-        <p>\(esc(url))</p>
         <p>\(esc(message))</p>
-        <p>Seçim tuşuna basılı tutarak menüyü açıp yeniden deneyebilirsin.</p>
+        <p><span class="url">\(esc(url))</span></p>
+        <p style="margin-top:40px">Seçim tuşuna basılı tutup menüden <b>Yenile</b>'yi seçerek yeniden deneyebilirsin.</p>
         </div></body></html>
         """
     }

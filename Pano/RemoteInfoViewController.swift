@@ -9,9 +9,31 @@ final class RemoteInfoViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 0.05, green: 0.06, blue: 0.08, alpha: 0.97)
+        let background = AmbientBackground(frame: view.bounds)
+        background.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(background)
+        let card = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+        card.layer.cornerRadius = 48
+        card.clipsToBounds = true
+        card.layer.borderWidth = 1
+        card.layer.borderColor = UIColor(white: 1, alpha: 0.12).cgColor
+        card.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(card)
 
-        let title = label("Telefondan kontrol", size: 56, weight: .bold)
+        let badge = UIImageView(image: Theme.symbol("iphone.radiowaves.left.and.right", size: 34))
+        badge.tintColor = .white
+        badge.contentMode = .center
+        let badgeBG = GradientView()
+        badgeBG.layer.cornerRadius = 22
+        badgeBG.layer.masksToBounds = true
+        badgeBG.addSubview(badge)
+        badgeBG.translatesAutoresizingMaskIntoConstraints = false
+        badge.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            badgeBG.widthAnchor.constraint(equalToConstant: 76), badgeBG.heightAnchor.constraint(equalToConstant: 76),
+            badge.centerXAnchor.constraint(equalTo: badgeBG.centerXAnchor), badge.centerYAnchor.constraint(equalTo: badgeBG.centerYAnchor),
+        ])
+        let title = label("Telefondan kontrol", size: 58, weight: .heavy)
         let info = label("iPhone kamerasıyla QR kodu okut. Telefon ve Apple TV aynı Wi-Fi ağında olmalı.\n" +
                          "Telefondan adres gönderebilir, metin yazabilir, dokunmatik alanla imleci yönetebilirsin.",
                          size: 28, weight: .regular, color: UIColor(white: 1, alpha: 0.7))
@@ -19,13 +41,14 @@ final class RemoteInfoViewController: UIViewController {
         qr.contentMode = .scaleAspectFit
         qr.layer.magnificationFilter = .nearest
         qr.backgroundColor = .white
-        qr.layer.cornerRadius = 18
+        qr.layer.cornerRadius = 32
         qr.layer.masksToBounds = true
 
         let address = server.address
         let addressLabel = label(address ?? "Ağ adresi bulunamadı — Apple TV Wi-Fi/Ethernet'e bağlı mı?",
                                  size: 34, weight: .semibold)
-        let pinLabel = label("PIN: \(server.pin)", size: 28, weight: .medium, color: UIColor(white: 1, alpha: 0.6))
+        let pinLabel = UILabel()
+        pinLabel.attributedText = Theme.label("PIN  \(server.pin)", symbol: "lock.fill", size: 28, color: UIColor(white: 1, alpha: 0.7))
         if let address { qr.image = Self.qrImage(address) }
 
         let close = UIButton(type: .system)
@@ -39,7 +62,7 @@ final class RemoteInfoViewController: UIViewController {
 
         let buttons = UIStackView(arrangedSubviews: [close, disable])
         buttons.spacing = 40
-        let text = UIStackView(arrangedSubviews: [title, info, addressLabel, pinLabel, buttons])
+        let text = UIStackView(arrangedSubviews: [badgeBG, title, info, addressLabel, pinLabel, buttons])
         text.axis = .vertical
         text.spacing = 30
         text.alignment = .leading
@@ -54,6 +77,10 @@ final class RemoteInfoViewController: UIViewController {
             text.widthAnchor.constraint(equalToConstant: 900),
             row.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             row.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            card.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: -70),
+            card.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: 70),
+            card.topAnchor.constraint(equalTo: row.topAnchor, constant: -70),
+            card.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: 70),
         ])
     }
 
