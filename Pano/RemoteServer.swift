@@ -177,18 +177,18 @@ enum RemotePage {
     <meta name="apple-mobile-web-app-capable" content="yes"><title>Pano Kumanda</title>
     <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    body{margin:0;font-family:-apple-system,sans-serif;background:#0d0f14;color:#eef1f7;padding:14px;padding-bottom:30px}
-    h1{font-size:20px;margin:4px 0 2px} .now{color:#8a93a6;font-size:13px;margin-bottom:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    body{margin:0;font-family:-apple-system,sans-serif;color:#f4f5fa;padding:18px;padding-bottom:30px;min-height:100vh;background:radial-gradient(500px 400px at 0% 0%,rgba(124,58,237,.55),transparent 70%),radial-gradient(500px 420px at 100% 100%,rgba(236,72,153,.4),transparent 70%),#07070f;background-attachment:fixed}
+    h1{font-size:26px;font-weight:800;margin:4px 0 2px;letter-spacing:-.5px;display:flex;align-items:center;gap:10px} h1 i{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:inline-flex;align-items:center;justify-content:center} h1 i:after{content:'';width:10px;height:10px;border-radius:50%;background:#fff} .now{color:#8a93a6;font-size:13px;margin-bottom:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .row{display:flex;gap:8px;margin-bottom:10px}
-    input,textarea{flex:1;font-size:16px;padding:12px;border-radius:12px;border:1px solid #2a3040;background:#171b24;color:#fff;min-width:0}
+    input,textarea{flex:1;font-size:16px;padding:14px 16px;border-radius:16px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);-webkit-backdrop-filter:blur(20px);color:#fff;min-width:0;outline:none}
     textarea{height:70px;resize:none;width:100%}
-    button{font-size:15px;padding:12px 14px;border-radius:12px;border:0;background:#2a3040;color:#fff;font-weight:600}
-    button.p{background:#4f6bff} button:active{opacity:.6}
-    #pad{height:300px;border-radius:18px;background:#171b24;border:1px solid #2a3040;display:flex;align-items:center;justify-content:center;color:#5a6378;font-size:14px;touch-action:none;user-select:none;-webkit-user-select:none;margin-bottom:10px;text-align:center;line-height:1.5}
+    button{font-size:15px;padding:13px 14px;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.09);color:#fff;font-weight:600}
+    button.p{background:linear-gradient(135deg,#7c3aed,#ec4899);border:0} button:active{opacity:.6}
+    #pad{height:300px;border-radius:24px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:#5a6378;font-size:14px;touch-action:none;user-select:none;-webkit-user-select:none;margin-bottom:10px;text-align:center;line-height:1.5}
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
     .sec{font-size:13px;color:#8a93a6;margin:16px 0 8px;text-transform:uppercase;letter-spacing:.5px}
     </style></head><body>
-    <h1>Pano Kumanda</h1><div class="now" id="now">Bağlanıyor…</div>
+    <h1><i></i>Pano Kumanda</h1><div class="now" id="now">Bağlanıyor…</div>
     <div class="sec">Adres / arama</div>
     <div class="row"><input id="url" type="url" placeholder="site.com veya aranacak kelime" autocapitalize="off" autocorrect="off"></div>
     <div class="row"><button class="p" style="flex:1" onclick="openUrl(false)">Aç</button><button style="flex:1" onclick="openUrl(true)">Yeni sekmede aç</button></div>

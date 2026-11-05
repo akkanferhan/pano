@@ -14,6 +14,13 @@ Bu özel API sayıldığı için **App Store'a gönderilemez**; yalnızca Xcode 
 3. Hedef cihaz olarak Apple TV'yi seç, Run (⌘R).
    Ücretsiz Apple ID ile imzalanan uygulamalar 7 günde bir yeniden yüklenmeli; ücretli geliştirici hesabında 1 yıl.
 
+## Tasarım
+
+Koyu zemin üzerinde mor → pembe vurgular ve cam (blur) yüzeyler. Katmanlı (parallax) tvOS ikonu ve Top Shelf görselleri
+`scripts/make-icons.py` ile üretilir (`python3 scripts/make-icons.py . onizleme.png`, Pillow gerekir); aynı görsel dil ana sayfada (selamlama, saat, site simgeli kutucuklar),
+kendiliğinden gizlenen yüzen üst çubukta, iPadOS tarzı imleçte, cam bildirimlerde ve telefon kumanda sayfasında kullanılır
+(`Pano/Theme.swift`).
+
 ## Özellikler
 
 - **Sekmeler** (en fazla 8): bağlantıyı yeni sekmede açma, `window.open` açılır pencereleri arka plan sekmesine yönlendirme

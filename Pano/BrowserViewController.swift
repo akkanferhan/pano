@@ -16,15 +16,14 @@ final class BrowserViewController: UIViewController {
     var engine: WebEngine? { activeTab?.engine }
 
     let container = UIView()
-    let cursor = UIImageView(image: BrowserViewController.cursorImage())
-    let topBar = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
-    let titleLabel = UILabel()
-    let hostLabel = UILabel()
-    let modeBadge = PaddedLabel.badge()
-    let tabsBadge = PaddedLabel.badge()
-    let privateBadge = PaddedLabel.badge()
-    let spinner = UIActivityIndicatorView(style: .medium)
-    let toast = PaddedLabel()
+    let cursor = CursorView()
+    let chrome = ChromeBar()
+    let toast = GlassToast()
+    var titleLabel: UILabel { chrome.titleLabel }
+    var hostLabel: UILabel { chrome.hostLabel }
+    var spinner: UIActivityIndicatorView { chrome.spinner }
+    private var chromeHide: DispatchWorkItem?
+    private var chromeShown = true
 
     var mode: Mode = .cursor
     private var lastTouch: CGPoint?
@@ -46,7 +45,8 @@ final class BrowserViewController: UIViewController {
     weak var fieldFrame: NSObject?
     private var videoWatch: Timer?
 
-    static let barHeight: CGFloat = 76
+    /// Web görünümü artık tam ekran; üst çubuk sayfanın üstünde yüzer ve kendiliğinden gizlenir.
+    static let barHeight: CGFloat = 0
     static let maxTabs = 8
 
     // MARK: Yaşam döngüsü
@@ -57,8 +57,8 @@ final class BrowserViewController: UIViewController {
         container.frame = view.bounds
         container.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(container)
-        setupTopBar()
-        setupToast()
+        setupChrome()
+        view.addSubview(toast)
 
         guard WebEngine.isAvailable else {
             showUnavailable()
@@ -83,53 +83,52 @@ final class BrowserViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        let w = view.bounds.width
-        topBar.frame = CGRect(x: 0, y: 0, width: w, height: Self.barHeight)
-        activeTab?.engine.view.frame = CGRect(x: 0, y: Self.barHeight, width: w, height: view.bounds.height - Self.barHeight)
-
-        let pad: CGFloat = 60
-        spinner.center = CGPoint(x: pad + 20, y: Self.barHeight / 2)
-        var right = w - pad
-        for badge in [modeBadge, tabsBadge, privateBadge] where !badge.isHidden {
-            let size = badge.sizeThatFits(CGSize(width: 400, height: 50))
-            badge.frame = CGRect(x: right - size.width, y: (Self.barHeight - size.height) / 2, width: size.width, height: size.height)
-            right = badge.frame.minX - 14
-        }
-        let textX = pad + 50
-        let textW = right - textX - 16
-        titleLabel.frame = CGRect(x: textX, y: 8, width: textW, height: 36)
-        hostLabel.frame = CGRect(x: textX, y: 42, width: textW, height: 26)
+        activeTab?.engine.view.frame = view.bounds
+        chrome.frame = CGRect(x: 80, y: 34, width: view.bounds.width - 160, height: ChromeBar.height)
     }
 
     override var preferredFocusEnvironments: [UIFocusEnvironment] { [] }
 
     // MARK: Kurulum
 
-    private func setupTopBar() {
-        view.addSubview(topBar)
-        titleLabel.font = .systemFont(ofSize: 28, weight: .semibold)
-        titleLabel.textColor = .white
-        hostLabel.font = .systemFont(ofSize: 20)
-        hostLabel.textColor = UIColor(white: 1, alpha: 0.6)
-        spinner.color = .white
-        spinner.hidesWhenStopped = true
-        privateBadge.text = "Gizli"
-        privateBadge.backgroundColor = UIColor(red: 0.36, green: 0.17, blue: 0.84, alpha: 0.9)
-        tabsBadge.backgroundColor = UIColor(white: 1, alpha: 0.18)
-        [titleLabel, hostLabel, spinner, modeBadge, tabsBadge, privateBadge].forEach { topBar.contentView.addSubview($0) }
+    private func setupChrome() {
+        view.addSubview(chrome)
         updateBadges()
     }
 
-    private func setupToast() {
-        toast.font = .systemFont(ofSize: 26, weight: .medium)
-        toast.textColor = .white
-        toast.backgroundColor = UIColor(white: 0.1, alpha: 0.88)
-        toast.layer.cornerRadius = 18
-        toast.layer.masksToBounds = true
-        toast.numberOfLines = 0
-        toast.textAlignment = .center
-        toast.alpha = 0
-        view.addSubview(toast)
+    /// Üst çubuğu gösterir; `autoHide` ise birkaç saniye sonra (yükleme bitmişse ve imleç üstte değilse) gizler.
+    func showChrome(autoHide: Bool = true, after delay: Double = 2.8) {
+        chromeHide?.cancel()
+        if !chromeShown {
+            chromeShown = true
+            view.bringSubviewToFront(chrome)
+            view.bringSubviewToFront(cursor)
+            UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.4, options: [.beginFromCurrentState]) {
+                self.chrome.alpha = 1
+                self.chrome.transform = .identity
+            }
+        }
+        if autoHide { scheduleChromeHide(after: delay) }
+    }
+
+    private func scheduleChromeHide(after delay: Double) {
+        chromeHide?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.hideChromeIfIdle() }
+        chromeHide = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func hideChromeIfIdle() {
+        guard chromeShown else { return }
+        if engine?.isLoading == true || (mode == .cursor && cursor.center.y < 170) {
+            scheduleChromeHide(after: 1.5)
+            return
+        }
+        chromeShown = false
+        UIView.animate(withDuration: 0.35, delay: 0, options: [.beginFromCurrentState, .curveEaseIn]) {
+            self.chrome.alpha = 0
+            self.chrome.transform = CGAffineTransform(translationX: 0, y: -30).scaledBy(x: 0.97, y: 0.97)
+        }
     }
 
     private func showUnavailable() {
@@ -152,7 +151,8 @@ final class BrowserViewController: UIViewController {
         e.scrollView?.contentInset = .zero
         e.onStart = { [weak self, weak tab] in
             guard let self, let tab, tab === self.activeTab else { return }
-            self.spinner.startAnimating()
+            self.chrome.setLoading(true)
+            self.showChrome(autoHide: false)
         }
         e.onFinish = { [weak self, weak tab] in
             guard let self, let tab else { return }
@@ -215,14 +215,14 @@ final class BrowserViewController: UIViewController {
         current = index
         let t = tabs[index]
         container.addSubview(t.engine.view)
-        t.engine.view.frame = CGRect(x: 0, y: Self.barHeight, width: view.bounds.width,
-                                     height: view.bounds.height - Self.barHeight)
+        t.engine.view.frame = view.bounds
         if t.needsLoad {
             t.needsLoad = false
             if let url = t.pendingURL { t.engine.load(url) } else { loadHome(in: t) }
         }
         hovering = false
-        cursor.transform = .identity
+        cursor.setHovering(false, animated: false)
+        showChrome()
         updateBar()
         updateBadges()
         saveSession()
@@ -348,7 +348,7 @@ final class BrowserViewController: UIViewController {
     }
 
     private func pageFailed(_ t: Tab, _ error: NSError) {
-        if t === activeTab, !t.engine.isLoading { spinner.stopAnimating() }
+        if t === activeTab, !t.engine.isLoading { chrome.setLoading(false) }
         // -999: iptal; WebKit 102: çerçeve yüklemesi kesildi; 204: eklenti (video) yüklemeyi üstlendi
         if error.code == NSURLErrorCancelled { return }
         if error.domain == "WebKitErrorDomain" && (error.code == 102 || error.code == 204) { return }
@@ -403,24 +403,29 @@ final class BrowserViewController: UIViewController {
 
     func updateBar() {
         guard let t = activeTab else { return }
-        titleLabel.text = t.title
+        let url = t.url ?? t.pendingURL
+        let host: String
+        let symbol: String
         if t.isHome {
-            hostLabel.text = store.privateMode ? "Pano · gizli gezinme" : "Pano"
+            host = store.privateMode ? "Pano · gizli gezinme" : "Pano"
+            symbol = store.privateMode ? "eye.slash.fill" : "house.fill"
         } else {
-            hostLabel.text = (t.url ?? t.pendingURL)?.absoluteString ?? ""
+            host = url.map { ($0.host ?? $0.absoluteString) + ($0.path.count > 1 ? $0.path : "") } ?? ""
+            symbol = t.isReader ? "doc.plaintext" : (url?.scheme == "https" ? "lock.fill" : "globe")
         }
-        if t.engine.isLoading { spinner.startAnimating() } else { spinner.stopAnimating() }
+        let loading = t.engine.isLoading
+        chrome.update(title: t.title, host: host, symbol: symbol, loading: loading)
+        if loading {
+            showChrome(autoHide: false)
+        } else if t.isHome {
+            scheduleChromeHide(after: 1.2) // ana sayfanın kendi başlığı var
+        } else {
+            showChrome()
+        }
     }
 
     func updateBadges() {
-        modeBadge.text = mode == .cursor ? "İmleç" : "Kaydırma"
-        modeBadge.backgroundColor = mode == .cursor
-            ? UIColor(red: 0.31, green: 0.42, blue: 1, alpha: 0.85)
-            : UIColor(red: 0.07, green: 0.6, blue: 0.56, alpha: 0.85)
-        tabsBadge.text = "\(tabs.count) sekme"
-        tabsBadge.isHidden = tabs.count < 2
-        privateBadge.isHidden = !store.privateMode
-        view.setNeedsLayout()
+        chrome.setBadges(cursorMode: mode == .cursor, tabCount: tabs.count, isPrivate: store.privateMode)
     }
 
     // MARK: Kumanda: dokunmatik yüzey
@@ -469,12 +474,12 @@ final class BrowserViewController: UIViewController {
     }
 
     func moveCursor(by delta: CGPoint) {
-        let area = CGRect(x: 0, y: Self.barHeight, width: view.bounds.width, height: view.bounds.height - Self.barHeight)
-            .insetBy(dx: 4, dy: 4)
+        let area = view.bounds.insetBy(dx: 4, dy: 4)
         let target = CGPoint(x: cursor.center.x + delta.x, y: cursor.center.y + delta.y)
         let clamped = CGPoint(x: min(max(target.x, area.minX), area.maxX),
                               y: min(max(target.y, area.minY), area.maxY))
         cursor.center = clamped
+        if clamped.y < 150 { showChrome() }
         let overflow = CGPoint(x: target.x - clamped.x, y: target.y - clamped.y)
         if overflow != .zero { scrollPage(by: CGPoint(x: overflow.x * 2.5, y: overflow.y * 2.5)) }
     }
@@ -484,9 +489,7 @@ final class BrowserViewController: UIViewController {
         let h = e.js(Pages.hover(p)) == "1"
         guard h != hovering else { return }
         hovering = h
-        UIView.animate(withDuration: 0.12) {
-            self.cursor.transform = h ? CGAffineTransform(scaleX: 1.4, y: 1.4) : .identity
-        }
+        cursor.setHovering(h)
     }
 
     /// İmlecin web görünümündeki konumu ve kaydırma durumu.
@@ -632,7 +635,9 @@ final class BrowserViewController: UIViewController {
         stopMomentum()
         UIView.animate(withDuration: 0.2) { self.cursor.alpha = newMode == .cursor ? 1 : 0 }
         updateBadges()
-        showToast(newMode == .cursor ? "İmleç modu" : "Kaydırma modu — tıklayınca imlece dön")
+        showToast(newMode == .cursor ? "İmleç modu" : "Kaydırma modu — tıklayınca imlece dön",
+                  symbol: newMode == .cursor ? "cursorarrow" : "arrow.up.and.down")
+        showChrome()
     }
 
     // MARK: Tıklama ve form alanları
@@ -1067,52 +1072,37 @@ final class BrowserViewController: UIViewController {
         for delay in [0.0, 1.0, 3.0, 6.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 guard let self, let e = self.engine else { return }
-                if e.isLoading { self.spinner.startAnimating() } else { self.spinner.stopAnimating() }
+                self.chrome.setLoading(e.isLoading)
+                if !e.isLoading { self.updateBar() }
             }
         }
     }
 
-    func showToast(_ text: String) {
-        toast.text = text
-        let size = toast.sizeThatFits(CGSize(width: 1100, height: 400))
-        toast.frame = CGRect(x: (view.bounds.width - size.width) / 2, y: view.bounds.height - size.height - 70,
-                             width: size.width, height: size.height)
-        view.bringSubviewToFront(toast)
-        toast.layer.removeAllAnimations()
-        UIView.animate(withDuration: 0.2, animations: { self.toast.alpha = 1 }) { _ in
-            UIView.animate(withDuration: 0.4, delay: 2.2, options: [], animations: { self.toast.alpha = 0 })
-        }
+    func showToast(_ text: String, symbol: String? = nil) {
+        toast.show(text, symbol: symbol ?? Self.toastSymbol(for: text), in: view)
+    }
+
+    /// Bildirim metnine uygun SF Symbol.
+    private static func toastSymbol(for text: String) -> String? {
+        let t = text.lowercased()
+        let table: [(String, String)] = [
+            ("sık kullanılan", "star.fill"), ("sekme", "square.on.square"), ("video", "play.rectangle.fill"),
+            ("altyazı", "captions.bubble.fill"), ("gizli", "eye.slash.fill"), ("reklam", "shield.lefthalf.filled"),
+            ("yakınlaştırma", "plus.magnifyingglass"), ("bulunamadı", "magnifyingglass"), ("okuma", "doc.plaintext"),
+            ("telefon", "iphone"), ("bölüm", "forward.end.fill"), ("kaynak", "list.bullet.rectangle"),
+            ("temizlen", "trash"), ("silindi", "trash"), ("açılamıyor", "exclamationmark.triangle.fill"),
+            ("başarısız", "exclamationmark.triangle.fill"), ("kaydedildi", "checkmark.circle.fill"),
+        ]
+        return table.first { t.contains($0.0) }?.1 ?? "info.circle.fill"
     }
 
     private func bounceCursor() {
-        let rest: CGAffineTransform = hovering ? CGAffineTransform(scaleX: 1.4, y: 1.4) : .identity
-        UIView.animate(withDuration: 0.08, animations: {
-            self.cursor.transform = rest.scaledBy(x: 0.7, y: 0.7)
-        }) { _ in
-            UIView.animate(withDuration: 0.12) { self.cursor.transform = rest }
-        }
+        cursor.bounce()
     }
 
     func parseObject(_ json: String?) -> [String: Any]? {
         guard let data = json?.data(using: .utf8) else { return nil }
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-    }
-
-    private static func cursorImage() -> UIImage {
-        let size = CGSize(width: 44, height: 44)
-        return UIGraphicsImageRenderer(size: size).image { ctx in
-            let c = ctx.cgContext
-            c.setShadow(offset: CGSize(width: 0, height: 2), blur: 6, color: UIColor.black.withAlphaComponent(0.6).cgColor)
-            let outer = CGRect(x: 8, y: 8, width: 28, height: 28)
-            c.setFillColor(UIColor.white.withAlphaComponent(0.95).cgColor)
-            c.fillEllipse(in: outer)
-            c.setShadow(offset: .zero, blur: 0)
-            c.setStrokeColor(UIColor(white: 0.1, alpha: 0.9).cgColor)
-            c.setLineWidth(3)
-            c.strokeEllipse(in: outer.insetBy(dx: 1.5, dy: 1.5))
-            c.setFillColor(UIColor(red: 0.31, green: 0.42, blue: 1, alpha: 1).cgColor)
-            c.fillEllipse(in: CGRect(x: 18, y: 18, width: 8, height: 8))
-        }
     }
 
     // MARK: Debug
@@ -1189,11 +1179,11 @@ final class PaddedLabel: UILabel {
 
     static func badge() -> PaddedLabel {
         let l = PaddedLabel()
-        l.insets = UIEdgeInsets(top: 6, left: 16, bottom: 6, right: 16)
-        l.font = .systemFont(ofSize: 20, weight: .semibold)
+        l.insets = UIEdgeInsets(top: 9, left: 18, bottom: 9, right: 18)
+        l.font = .systemFont(ofSize: 19, weight: .semibold)
         l.textColor = .white
         l.textAlignment = .center
-        l.layer.cornerRadius = 10
+        l.layer.cornerRadius = 22
         l.layer.masksToBounds = true
         return l
     }
