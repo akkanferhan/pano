@@ -118,12 +118,20 @@ final class BrowserViewController: UIViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
+    /// Gizler; yalnızca imleç çubuğun tam üzerindeyse (rozetlere tıklamak için) açık bırakır.
     private func hideChromeIfIdle() {
         guard chromeShown else { return }
-        if engine?.isLoading == true || (mode == .cursor && cursor.center.y < 170) {
+        if mode == .cursor && chrome.frame.insetBy(dx: -10, dy: -10).contains(cursor.center) {
             scheduleChromeHide(after: 1.5)
             return
         }
+        hideChromeNow()
+    }
+
+    /// Çubuğu hemen gizler (aşağı kaydırırken içerik çubuğun altında kalmasın).
+    func hideChromeNow() {
+        chromeHide?.cancel()
+        guard chromeShown else { return }
         chromeShown = false
         UIView.animate(withDuration: 0.35, delay: 0, options: [.beginFromCurrentState, .curveEaseIn]) {
             self.chrome.alpha = 0
@@ -151,8 +159,7 @@ final class BrowserViewController: UIViewController {
         e.scrollView?.contentInset = .zero
         e.onStart = { [weak self, weak tab] in
             guard let self, let tab, tab === self.activeTab else { return }
-            self.chrome.setLoading(true)
-            self.showChrome(autoHide: false)
+            self.chrome.setLoading(true) // iframe yüklemeleri de buraya düşer: çubuğu burada açma
         }
         e.onFinish = { [weak self, weak tab] in
             guard let self, let tab else { return }
@@ -313,6 +320,10 @@ final class BrowserViewController: UIViewController {
             t.loadStartedAt = Date()
             t.handledInterimFinish = false
             t.finalHandled = false
+            DispatchQueue.main.async { [weak self, weak t] in
+                guard let self, let t, t === self.activeTab else { return }
+                self.showChrome(autoHide: true, after: 3) // yeni sayfa: adres kısa süre görünsün
+            }
             #if DEBUG
             t.perfStart = Date(); t.perfFinishes = 0; t.perfOurTime = 0; t.perfLogged = false
             #endif
@@ -446,15 +457,9 @@ final class BrowserViewController: UIViewController {
             host = url.map { ($0.host ?? $0.absoluteString) + ($0.path.count > 1 ? $0.path : "") } ?? ""
             symbol = t.isReader ? "doc.plaintext" : (url?.scheme == "https" ? "lock.fill" : "globe")
         }
-        let loading = t.engine.isLoading
-        chrome.update(title: t.title, host: host, symbol: symbol, loading: loading)
-        if loading {
-            showChrome(autoHide: false)
-        } else if t.isHome {
-            scheduleChromeHide(after: 1.2) // ana sayfanın kendi başlığı var
-        } else {
-            showChrome()
-        }
+        chrome.update(title: t.title, host: host, symbol: symbol, loading: t.engine.isLoading)
+        if t.isHome { scheduleChromeHide(after: 1.2) } // ana sayfanın kendi başlığı var
+        // Çubuk yalnızca yeni sayfaya geçişte, sekme/mod değişince ve yukarı kaydırınca açılır.
     }
 
     func updateBadges() {
@@ -518,7 +523,6 @@ final class BrowserViewController: UIViewController {
         let clamped = CGPoint(x: min(max(target.x, area.minX), area.maxX),
                               y: min(max(target.y, area.minY), area.maxY))
         cursor.center = clamped
-        if clamped.y < 150 { showChrome() }
         let overflow = CGPoint(x: target.x - clamped.x, y: target.y - clamped.y)
         // Kenara itince yumuşak kaydırma: ne kadar itilirse o kadar hızlı
         if overflow != .zero { smoothScroll(by: CGPoint(x: overflow.x * 3, y: overflow.y * 3)) }
@@ -568,6 +572,8 @@ final class BrowserViewController: UIViewController {
     /// hedefe yavaşlayarak götürür (kenara itme, kaydırma modu, süzülme, yön tuşları, telefon).
     func smoothScroll(by delta: CGPoint) {
         guard let sv = engine?.scrollView else { return }
+        // Safari gibi: aşağı kaydırınca üst çubuk gizlenir, yukarı kaydırınca geri gelir
+        if delta.y > 3 { hideChromeNow() } else if delta.y < -3 { showChrome() }
         let base = smoothTarget ?? sv.contentOffset
         smoothTarget = clampedOffset(CGPoint(x: base.x + delta.x, y: base.y + delta.y), in: sv)
         if smoothLink == nil {
