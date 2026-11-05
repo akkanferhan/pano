@@ -212,6 +212,29 @@ enum Pages {
     }
     """
 
+    /// Eski WebKit, `crossorigin` öznitelikli bir video CORS hatası alınca uygulamayı çökertiyor.
+    /// Altyazıları zaten kendimiz yüklediğimiz için medya öğelerinde bu özniteliği kaldırır ve yeniden eklenmesini engeller.
+    static let mediaSafety = """
+    (function(){
+      try {
+        if (!window.__panoMediaSafe) {
+          window.__panoMediaSafe = true;
+          var MP = window.HTMLMediaElement && HTMLMediaElement.prototype;
+          if (MP) {
+            try { Object.defineProperty(MP, 'crossOrigin', { configurable: true, get: function(){ return null; }, set: function(){} }); } catch(e) {}
+            var origSet = Element.prototype.setAttribute;
+            Element.prototype.setAttribute = function(n, v){
+              if (this instanceof HTMLMediaElement && String(n).toLowerCase() === 'crossorigin') return;
+              return origSet.apply(this, arguments);
+            };
+          }
+        }
+        var ms = document.querySelectorAll('video[crossorigin],audio[crossorigin]');
+        for (var i=0;i<ms.length;i++){ ms[i].removeAttribute('crossorigin'); }
+      } catch(e) {}
+    })()
+    """
+
     /// Ana çerçevede, imleç konumuna tıklar.
     static func click(_ p: Pointer) -> String {
         """
@@ -323,6 +346,45 @@ enum Pages {
       return JSON.stringify(out);
     })()
     """
+
+    /// Bu çerçevedeki altyazılar: videoların metin izleri (satırlarıyla), `<track>` dosyaları ve sayfa
+    /// kaynağında / oynatıcı ayarlarında geçen .vtt/.srt adresleri.
+    static let subtitles = #"""
+    (function(){
+      var out = {tracks:[], urls:[], href: location.href};
+      var vs = document.querySelectorAll('video');
+      for (var i=0;i<vs.length;i++){
+        var v = vs[i];
+        try {
+          for (var j=0;j<v.textTracks.length;j++){
+            var tt = v.textTracks[j];
+            if (tt.kind !== 'subtitles' && tt.kind !== 'captions') continue;
+            if (tt.mode === 'disabled') tt.mode = 'hidden';
+            var cues = [], c = tt.cues;
+            if (c) for (var k=0;k<c.length && k<5000;k++){ cues.push([c[k].startTime, c[k].endTime, c[k].text || '']); }
+            if (cues.length) out.tracks.push({label: tt.label || '', lang: tt.language || '', cues: cues});
+          }
+        } catch(e) {}
+        var trs = v.querySelectorAll('track[src]');
+        for (var t=0;t<trs.length;t++){ out.urls.push({src: trs[t].src, label: trs[t].label || '', lang: trs[t].srclang || ''}); }
+      }
+      try {
+        var html = document.documentElement.outerHTML.replace(/\\\//g, '/');
+        var re = /["'(=]((?:https?:)?[^"'()\s<>=]*?\.(?:vtt|srt)(?:\?[^"'()\s<>]*)?)["')\s]/gi, m, n = 0;
+        while ((m = re.exec(html)) && n < 40) {
+          n++;
+          try {
+            var u = new URL(m[1], location.href).href;
+            var around = html.substr(Math.max(0, m.index - 160), 320);
+            var lm = around.match(/label["']?\s*[:=]\s*["']([^"']{1,40})["']/i);
+            var gm = around.match(/(?:srclang|language|lang)["']?\s*[:=]\s*["']([^"']{1,10})["']/i);
+            out.urls.push({src: u, label: lm ? lm[1] : '', lang: gm ? gm[1] : ''});
+          } catch(e) {}
+        }
+      } catch(e) {}
+      return JSON.stringify(out);
+    })()
+    """#
 
     static let pauseVideos = "(function(){var v=document.querySelectorAll('video');for(var i=0;i<v.length;i++){try{v[i].pause()}catch(e){}}})()"
 
