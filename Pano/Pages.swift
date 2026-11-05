@@ -212,8 +212,9 @@ enum Pages {
     }
     """
 
-    /// Eski WebKit, `crossorigin` öznitelikli bir video CORS hatası alınca uygulamayı çökertiyor.
-    /// Altyazıları zaten kendimiz yüklediğimiz için medya öğelerinde bu özniteliği kaldırır ve yeniden eklenmesini engeller.
+    /// Medya güvenliği: (1) Eski WebKit, `crossorigin` öznitelikli video CORS hatası alınca çöküyor; altyazıları kendimiz
+    /// yüklediğimiz için bu öznitelik kaldırılır. (2) Videolar sayfada oynatılmaz (`play()` yalnızca işaret bırakır,
+    /// autoplay kaldırılır); Pano işareti görüp videoyu tvOS oynatıcısında açar.
     static let mediaSafety = """
     (function(){
       try {
@@ -222,6 +223,9 @@ enum Pages {
           var MP = window.HTMLMediaElement && HTMLMediaElement.prototype;
           if (MP) {
             try { Object.defineProperty(MP, 'crossOrigin', { configurable: true, get: function(){ return null; }, set: function(){} }); } catch(e) {}
+            // play(): web motorunda oynatma yerine isteği işaretle; Pano videoyu tvOS oynatıcısında açar.
+            MP.play = function(){ this.__panoPlayRequested = Date.now(); return Promise.resolve(); };
+            try { MP.webkitEnterFullscreen = function(){ this.__panoPlayRequested = Date.now(); }; } catch(e) {}
             var origSet = Element.prototype.setAttribute;
             Element.prototype.setAttribute = function(n, v){
               if (this instanceof HTMLMediaElement && String(n).toLowerCase() === 'crossorigin') return;
@@ -231,6 +235,8 @@ enum Pages {
         }
         var ms = document.querySelectorAll('video[crossorigin],audio[crossorigin]');
         for (var i=0;i<ms.length;i++){ ms[i].removeAttribute('crossorigin'); }
+        var as = document.querySelectorAll('video[autoplay],audio[autoplay]');
+        for (var j=0;j<as.length;j++){ as[j].removeAttribute('autoplay'); try { as[j].autoplay = false; } catch(e) {} }
       } catch(e) {}
     })()
     """
@@ -341,7 +347,7 @@ enum Pages {
         var v = vs[i], s = v.currentSrc || v.src;
         if (!s) { var so = v.querySelector('source'); if (so) s = so.src; }
         if (!s) continue;
-        out.push({src:s, t:v.currentTime||0, paused:!!v.paused, blob:/^blob:/i.test(s), playable:/^https?:/i.test(s), href:location.href});
+        out.push({src:s, t:v.currentTime||0, paused:!!v.paused && !v.__panoPlayRequested, req:v.__panoPlayRequested||0, blob:/^blob:/i.test(s), playable:/^https?:/i.test(s), href:location.href});
       }
       return JSON.stringify(out);
     })()
