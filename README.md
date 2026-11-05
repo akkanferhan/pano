@@ -25,6 +25,10 @@ Bu özel API sayıldığı için **App Store'a gönderilemez**; yalnızca Xcode 
 - **Film sitesi oynatıcıları**: tıklama, başka siteden gelen oynatıcı iframe'lerinin içine iletilir (WebKit1 `WebFrame` API'si köken kısıtına takılmaz).
   Tıklamadan sonra ~12 sn içinde başlayan video ya da ağdan istenen `.m3u8`/`.mp4` adresi yakalanıp tvOS oynatıcısında,
   doğru Referer/Origin başlıklarıyla otomatik açılır. Menüde "Videoyu tam ekran oynat" bulunan tüm adayları listeler.
+  Oynatıcı açılırken sitenin harici altyazıları (`<track>`, sayfadaki oynatıcının yüklediği satırlar, ağdan istenen
+  `.vtt`/`.srt` dosyaları, oynatıcı ayarlarında geçen adresler) toplanır ve videonun üstünde gösterilir; Türkçe olan
+  otomatik seçilir, Windows-1254 SRT'ler doğru çözülür. Oynatıcının üst çubuğunda altyazı seçimi, zamanlama kaydırma
+  (±0,5 / ±2 sn) ve yazı boyutu menüleri var. HLS akışına gömülü Türkçe altyazı varsa o seçilir.
   Not: bu motorda `MediaSource` yok; videoyu yalnızca MSE ile oynatan (blob:) ve DRM'li oynatıcılar desteklenmez.
 - **Sayfada bul**: tüm eşleşmeleri vurgular, ◀ ▶ ile gezilir
 - **Sık kullanılanlar**: ekle, sil, yeniden adlandır, adresi düzenle, sırala

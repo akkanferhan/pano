@@ -8,9 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		2D5B9D47E614864EA06B5B9F /* Pages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 694F97CD52207D197409DF84 /* Pages.swift */; };
+		80C67AD9DD050995062FD748 /* VideoPlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365FE3C96C85007BC20A5EC3 /* VideoPlayerController.swift */; };
 		9307D2A20A245D1DC6C30A5B /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0623588F177B0E7311BB66DE /* Store.swift */; };
 		B6117B92D7F313C88214FB55 /* BrowserViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0472B9780599C9A600AD9006 /* BrowserViewController.swift */; };
 		BF29B473D50DC0A5A1E9CE26 /* BrowserViewController+Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B64AC27B2BC3CE8463EC82 /* BrowserViewController+Menus.swift */; };
+		BF6D7725BC74D9B995194E7B /* Subtitles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8DA55794B86B7F05B6ACEE3 /* Subtitles.swift */; };
 		C1A9058AC50E83C6E55F8C44 /* MediaSniffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78ADAF404D56F0CF0D4453E8 /* MediaSniffer.swift */; };
 		C93D36D6535B98167A256964 /* WebEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E881610FD10C67278F9247E8 /* WebEngine.swift */; };
 		CED7972C6316B6E47B428D44 /* Tab.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD13DC09C6B6022F075E1F2C /* Tab.swift */; };
@@ -24,10 +26,12 @@
 		0623588F177B0E7311BB66DE /* Store.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
 		18FFD055FC17CB4A48EE30E2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		24816FD7623B37E865E76662 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		365FE3C96C85007BC20A5EC3 /* VideoPlayerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPlayerController.swift; sourceTree = "<group>"; };
 		6540C2E2370AD359ED7BF453 /* AdBlocker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdBlocker.swift; sourceTree = "<group>"; };
 		694F97CD52207D197409DF84 /* Pages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pages.swift; sourceTree = "<group>"; };
 		75B64AC27B2BC3CE8463EC82 /* BrowserViewController+Menus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrowserViewController+Menus.swift"; sourceTree = "<group>"; };
 		78ADAF404D56F0CF0D4453E8 /* MediaSniffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSniffer.swift; sourceTree = "<group>"; };
+		A8DA55794B86B7F05B6ACEE3 /* Subtitles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subtitles.swift; sourceTree = "<group>"; };
 		AD13DC09C6B6022F075E1F2C /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
 		AF22A45DD1021A67EE7E2992 /* Pano.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Pano.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B94400302E890E027583C578 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -47,7 +51,9 @@
 				78ADAF404D56F0CF0D4453E8 /* MediaSniffer.swift */,
 				694F97CD52207D197409DF84 /* Pages.swift */,
 				0623588F177B0E7311BB66DE /* Store.swift */,
+				A8DA55794B86B7F05B6ACEE3 /* Subtitles.swift */,
 				AD13DC09C6B6022F075E1F2C /* Tab.swift */,
+				365FE3C96C85007BC20A5EC3 /* VideoPlayerController.swift */,
 				E881610FD10C67278F9247E8 /* WebEngine.swift */,
 			);
 			path = Pano;
@@ -147,7 +153,9 @@
 				C1A9058AC50E83C6E55F8C44 /* MediaSniffer.swift in Sources */,
 				2D5B9D47E614864EA06B5B9F /* Pages.swift in Sources */,
 				9307D2A20A245D1DC6C30A5B /* Store.swift in Sources */,
+				BF6D7725BC74D9B995194E7B /* Subtitles.swift in Sources */,
 				CED7972C6316B6E47B428D44 /* Tab.swift in Sources */,
+				80C67AD9DD050995062FD748 /* VideoPlayerController.swift in Sources */,
 				C93D36D6535B98167A256964 /* WebEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

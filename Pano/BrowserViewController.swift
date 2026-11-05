@@ -313,6 +313,7 @@ final class BrowserViewController: UIViewController {
         if t === activeTab { refreshSpinnerSoon() }
         let marker = e.js("document.documentElement.getAttribute('data-pano')") ?? ""
         e.js(Pages.afterLoad(textScale: store.textScale, adBlock: store.adBlockEnabled))
+        for f in e.allFrames() { e.evaluate(Pages.mediaSafety, in: f) }
         let url = e.currentURL
         t.isHome = marker == "home"
         if t.isHome {
@@ -631,6 +632,7 @@ final class BrowserViewController: UIViewController {
         var baseline: [String: Bool] = [:]
         for v in allVideos() where baseline[v.src] == nil { baseline[v.src] = v.paused }
         let clickTime = Date()
+        for f in e.allFrames() { e.evaluate(Pages.mediaSafety, in: f) } // WebKit çökmesine karşı (bkz. Pages.mediaSafety)
 
         // Tıklama bir iframe'e denk gelirse, o iframe'in çerçevesinde (gerekirse iç içe) tekrar tıkla.
         var frame: NSObject?
@@ -873,10 +875,59 @@ final class BrowserViewController: UIViewController {
         ]
         let player = AVPlayer(playerItem: AVPlayerItem(asset: AVURLAsset(url: url, options: options)))
         if time > 1 { player.seek(to: CMTime(seconds: time, preferredTimescale: 600)) }
+        let subtitles = subtitleSources()
         if let e = engine { for frame in e.allFrames() { e.evaluate(Pages.pauseVideos, in: frame) } }
-        let vc = AVPlayerViewController()
-        vc.player = player
+        let vc = VideoPlayerController()
+        vc.configure(player: player, subtitles: subtitles, userAgent: store.currentUA)
         present(vc, animated: true) { player.play() }
+    }
+
+    /// Sayfadaki (tüm iframe'ler dahil) ve bu sayfada ağdan istenen altyazılar.
+    func subtitleSources() -> [SubtitleSource] {
+        guard let e = engine else { return [] }
+        var result: [SubtitleSource] = []
+        var seen = Set<String>()
+        func append(_ source: SubtitleSource) {
+            guard !seen.contains(source.key) else { return }
+            seen.insert(source.key)
+            result.append(source)
+        }
+        for frame in e.allFrames() {
+            guard let info = parseObject(e.evaluate(Pages.subtitles, in: frame)) else { continue }
+            let href = info["href"] as? String
+            for track in info["tracks"] as? [[String: Any]] ?? [] {
+                let raw = track["cues"] as? [[Any]] ?? []
+                let cues = raw.compactMap { c -> SubtitleCue? in
+                    guard c.count == 3, let start = c[0] as? Double, let end = c[1] as? Double,
+                          let text = c[2] as? String else { return nil }
+                    let clean = Subtitles.cleanText(text)
+                    return clean.isEmpty ? nil : SubtitleCue(start: start, end: end, text: clean)
+                }
+                guard !cues.isEmpty else { continue }
+                let d = Subtitles.describe(label: track["label"] as? String ?? "", language: track["lang"] as? String, url: nil)
+                append(.cues(cues, label: d.label, language: d.language))
+            }
+            for item in info["urls"] as? [[String: Any]] ?? [] {
+                guard let src = item["src"] as? String, let url = URL(string: src),
+                      url.scheme == "http" || url.scheme == "https" else { continue }
+                let d = Subtitles.describe(label: item["label"] as? String ?? "", language: item["lang"] as? String, url: url)
+                append(.url(url, label: d.label, language: d.language, referer: href))
+            }
+        }
+        if let since = activeTab?.loadStartedAt {
+            for item in MediaSniffer.subtitles(since: since) {
+                let d = Subtitles.describe(label: "", language: nil, url: item.url)
+                append(.url(item.url, label: d.label, language: d.language, referer: item.referer))
+            }
+        }
+        // Aynı ada sahip altyazıları ayırt et
+        var counts: [String: Int] = [:]
+        return result.map { source in
+            guard case let .url(url, label, language, referer) = source else { return source }
+            counts[label, default: 0] += 1
+            let n = counts[label]!
+            return n > 1 ? .url(url, label: "\(label) (\(n))", language: language, referer: referer) : source
+        }
     }
 
     // MARK: Gizli gezinme
@@ -996,6 +1047,14 @@ final class BrowserViewController: UIViewController {
                         let f = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("debug-ua.txt")
                         try? "\(self.store.desktopMode) \(self.engine?.js("navigator.userAgent") ?? "")".write(to: f, atomically: true, encoding: .utf8)
                     }
+                case "subs":
+                    let f = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("debug-subs.txt")
+                    try? self.subtitleSources().map { src -> String in
+                        switch src {
+                        case let .url(u, l, g, r): return "url \(l) [\(g ?? "-")] \(u.absoluteString) ref=\(r ?? "-")"
+                        case let .cues(c, l, g): return "cues \(l) [\(g ?? "-")] \(c.count) satır"
+                        }
+                    }.joined(separator: "\n").write(to: f, atomically: true, encoding: .utf8)
                 case "blocked": UserDefaults.standard.set(AdBlocker.blockedCount, forKey: "debugBlockedCount")
                 default: break
                 }
