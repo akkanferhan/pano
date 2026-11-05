@@ -2,7 +2,7 @@ import UIKit
 
 /// Sağdan kayan cam menü paneli (UIAlertController action sheet yerine).
 /// Başlık + alt başlık, isteğe bağlı yuvarlak hızlı işlem düğmeleri ve bölümlere ayrılmış simgeli satırlar.
-final class MenuPanelController: UIViewController {
+final class MenuPanelController: UIViewController, UIViewControllerTransitioningDelegate {
     struct Item {
         var title: String
         var subtitle: String?
@@ -36,7 +36,7 @@ final class MenuPanelController: UIViewController {
         headerSubtitle = subtitle
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .overFullScreen
-        modalTransitionStyle = .crossDissolve
+        transitioningDelegate = self
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -93,7 +93,9 @@ final class MenuPanelController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         let w = Self.panelWidth
-        panel.frame = CGRect(x: view.bounds.width - w - 40, y: 40, width: w, height: view.bounds.height - 80)
+        // bounds + center (not frame): the panel carries a transform during the transition
+        panel.bounds = CGRect(x: 0, y: 0, width: w, height: view.bounds.height - 80)
+        panel.center = CGPoint(x: view.bounds.width - w / 2 - 40, y: view.bounds.height / 2)
         panel.contentView.subviews.first?.frame = panel.bounds
         panel.contentView.subviews.dropFirst().first?.frame = panel.bounds
         scroll.frame = panel.bounds.insetBy(dx: 40, dy: 0)
@@ -167,37 +169,40 @@ final class MenuPanelController: UIViewController {
         return firstRow.map { [$0] } ?? []
     }
 
-    // MARK: Açılış / kapanış
+    // MARK: Opening / closing (custom transition, coordinated by UIKit)
 
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        panel.transform = CGAffineTransform(translationX: Self.panelWidth + 80, y: 0)
-        dim.alpha = 0
-        UIView.animate(withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.86, initialSpringVelocity: 0.3, options: []) {
-            self.panel.transform = .identity
-            self.dim.alpha = 1
-        }
+    func animationController(forPresented presented: UIViewController, presenting: UIViewController,
+                             source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        PanelTransition(presenting: true)
     }
 
-    /// Paneli kaydırarak kapatır; ardından (varsa) işlemi çalıştırır.
+    func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        PanelTransition(presenting: false)
+    }
+
+    /// Off-screen state: panel slid out to the right and slightly scaled, background undimmed.
+    fileprivate func setHidden(_ hidden: Bool) {
+        panel.transform = hidden
+            ? CGAffineTransform(translationX: Self.panelWidth + 80, y: 0).scaledBy(x: 0.96, y: 0.96)
+            : .identity
+        dim.alpha = hidden ? 0 : 1
+    }
+
+    /// Closes the panel, then runs the action (if any).
     func close(then action: (() -> Void)? = nil) {
         guard !closing else { return }
         closing = true
-        UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseIn], animations: {
-            self.panel.transform = CGAffineTransform(translationX: Self.panelWidth + 80, y: 0)
-            self.dim.alpha = 0
-        }) { _ in
-            self.dismiss(animated: false) { action?() }
-        }
+        dismiss(animated: true) { action?() }
     }
 
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        if presses.first?.type == .menu { return }
+        if presses.first?.type == .menu || presses.first?.type == .playPause { return }
         super.pressesBegan(presses, with: event)
     }
 
+    /// Menu and Play/Pause (the key that opens the menu) close the panel.
     override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        if presses.first?.type == .menu { close(); return }
+        if presses.first?.type == .menu || presses.first?.type == .playPause { close(); return }
         super.pressesEnded(presses, with: event)
     }
 }
@@ -347,30 +352,36 @@ final class QuickActionButton: UIButton {
     }
 }
 
-// MARK: - Simge tahmini
+/// Panel slide transition: in with a soft spring, out with a short ease-in — one coordinated animation each way.
+private final class PanelTransition: NSObject, UIViewControllerAnimatedTransitioning {
+    private let presenting: Bool
+    init(presenting: Bool) { self.presenting = presenting }
 
-enum MenuSymbols {
-    /// Satır başlığından uygun SF Symbol.
-    static func symbol(for title: String) -> String? {
-        let t = title.lowercased(with: Locale(identifier: "tr_TR"))
-        let table: [(String, String)] = [
-            ("sık kullanılanlardan çıkar", "star.slash"), ("sık kullanılanlara ekle", "star"), ("sık kullanılanlar", "star.fill"),
-            ("bağlantıyı yeni sekmede", "arrow.up.forward.square"), ("yeni sekme", "plus.square.on.square"),
-            ("sekme kapat", "xmark.square"), ("sekmeyi kapat", "xmark.square"), ("diğer sekmeleri", "xmark.square"),
-            ("sekme", "square.on.square"), ("adres", "magnifyingglass"), ("video", "play.rectangle.fill"),
-            ("kaynak", "list.bullet.rectangle"), ("sonraki bölüm", "forward.end.fill"), ("sonraki eşleşme", "arrow.down.circle"),
-            ("okuma", "doc.plaintext"), ("sayfada bul", "text.magnifyingglass"), ("aramayı temizle", "xmark.circle"),
-            ("varsayılan yakınlaştırma", "plus.magnifyingglass"), ("yakınlaştırma", "plus.magnifyingglass"),
-            ("geçmişte ara", "magnifyingglass"), ("geçmişi temizle", "trash"), ("geçmiş", "clock.arrow.circlepath"),
-            ("gizli", "eye.slash"), ("telefon", "iphone"), ("ayarlar", "gearshape.fill"), ("kumanda", "appletvremote.gen4"),
-            ("site görünümü", "desktopcomputer"), ("reklam", "shield.lefthalf.filled"), ("imleç hızı", "cursorarrow.motionlines"),
-            ("yazı boyutu", "textformat.size"), ("arama motoru", "magnifyingglass.circle"), ("opensubtitles", "captions.bubble"),
-            ("api anahtar", "key.fill"), ("kullanıcı girişi", "person.crop.circle"), ("giriş yapıldı", "person.crop.circle.badge.checkmark"),
-            ("çıkış yap", "rectangle.portrait.and.arrow.right"), ("çerez", "trash"), ("izlemeye devam", "trash"),
-            ("düzenle", "pencil"), ("yeniden adlandır", "pencil"), ("en başa", "arrow.up.to.line"), ("yukarı", "arrow.up"),
-            ("aşağı", "arrow.down"), ("en sona", "arrow.down.to.line"), ("sil", "trash"), ("yenile", "arrow.clockwise"),
-            ("ana sayfa", "house.fill"), ("geri", "chevron.backward"), ("ileri", "chevron.forward"),
-        ]
-        return table.first { t.contains($0.0) }?.1
+    func transitionDuration(using context: UIViewControllerContextTransitioning?) -> TimeInterval {
+        presenting ? 0.5 : 0.3
+    }
+
+    func animateTransition(using context: UIViewControllerContextTransitioning) {
+        if presenting {
+            guard let panel = context.viewController(forKey: .to) as? MenuPanelController else { return context.completeTransition(false) }
+            panel.view.frame = context.finalFrame(for: panel)
+            context.containerView.addSubview(panel.view)
+            panel.view.layoutIfNeeded()
+            panel.setHidden(true)
+            UIView.animate(withDuration: transitionDuration(using: context), delay: 0, usingSpringWithDamping: 0.88,
+                           initialSpringVelocity: 0.2, options: [.curveEaseOut, .allowUserInteraction]) {
+                panel.setHidden(false)
+            } completion: { _ in
+                context.completeTransition(!context.transitionWasCancelled)
+            }
+        } else {
+            guard let panel = context.viewController(forKey: .from) as? MenuPanelController else { return context.completeTransition(false) }
+            UIView.animate(withDuration: transitionDuration(using: context), delay: 0, options: [.curveEaseIn, .beginFromCurrentState]) {
+                panel.setHidden(true)
+            } completion: { _ in
+                panel.view.removeFromSuperview()
+                context.completeTransition(!context.transitionWasCancelled)
+            }
+        }
     }
 }

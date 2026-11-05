@@ -2,6 +2,8 @@ import Foundation
 
 struct WatchProgress: Codable, Equatable {
     var pageURL: String
+    /// Videonun kimliği (adresin host + yol kısmı; sorgu/anahtar hariç). Eski kayıtlarda yok.
+    var videoKey: String?
     var title: String
     var position: Double
     var duration: Double
@@ -44,14 +46,19 @@ final class Store {
     static let desktopUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
     static let mobileUA = "Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
 
-    private let defaultBookmarks = [
-        Bookmark(title: "Google", url: "https://www.google.com"),
-        Bookmark(title: "YouTube", url: "https://www.youtube.com"),
-        Bookmark(title: "Vikipedi", url: "https://tr.wikipedia.org"),
-        Bookmark(title: "GitHub", url: "https://github.com"),
-        Bookmark(title: "Hacker News", url: "https://news.ycombinator.com"),
-        Bookmark(title: "Hava Durumu", url: "https://www.mgm.gov.tr"),
-    ]
+    /// First-run favorites, adapted to the app language (Wikipedia edition, weather site).
+    private var defaultBookmarks: [Bookmark] {
+        let lang = AppLanguage.shortCode
+        let wikiLang = ["zh", "hi", "es", "fr", "ar", "pt", "ru", "de", "ja", "tr"].contains(lang) ? lang : "en"
+        return [
+            Bookmark(title: "Google", url: "https://www.google.com"),
+            Bookmark(title: "YouTube", url: "https://www.youtube.com"),
+            Bookmark(title: L("Wikipedia"), url: "https://\(wikiLang).wikipedia.org"),
+            Bookmark(title: "GitHub", url: "https://github.com"),
+            Bookmark(title: "Hacker News", url: "https://news.ycombinator.com"),
+            Bookmark(title: L("Weather"), url: lang == "tr" ? "https://www.mgm.gov.tr" : "https://weather.com"),
+        ]
+    }
 
     // MARK: Sık kullanılanlar
 
@@ -213,21 +220,28 @@ final class Store {
         set { encode(Array(newValue.prefix(100)), "watchProgress") }
     }
 
-    func progress(for page: String) -> WatchProgress? {
-        watchProgress.first { $0.pageURL == page }
+    /// Bir sayfadaki tüm yarım kalmış videolar (aynı sayfada birden çok video olabilir).
+    func progressEntries(for page: String) -> [WatchProgress] {
+        watchProgress.filter { $0.pageURL == page }
     }
 
-    /// 30 sn'den kısa izlemeler kaydedilmez; bitmek üzere olanlar (son 90 sn) listeden çıkarılır.
-    func saveProgress(page: String, title: String, position: Double, duration: Double) {
+    /// Kayıt sayfa + video ikilisine göre tutulur. 30 sn'den kısa izlemeler kaydedilmez;
+    /// bitmek üzere olanlar (son 90 sn) listeden çıkarılır.
+    func saveProgress(page: String, videoKey: String?, title: String, position: Double, duration: Double) {
         guard position.isFinite else { return }
         var list = watchProgress
-        list.removeAll { $0.pageURL == page }
+        list.removeAll { $0.pageURL == page && ($0.videoKey == videoKey || $0.videoKey == nil) }
         let finished = duration.isFinite && duration > 0 && duration - position < 90
         if position >= 30 && !finished {
-            list.insert(WatchProgress(pageURL: page, title: title, position: position,
+            list.insert(WatchProgress(pageURL: page, videoKey: videoKey, title: title, position: position,
                                       duration: duration.isFinite ? duration : 0, date: Date()), at: 0)
         }
         watchProgress = list
+    }
+
+    /// Video adresinden kalıcı kimlik: host + yol (oturum anahtarı / sorgu kısmı atılır).
+    static func videoKey(for url: URL) -> String {
+        (url.host ?? "") + url.path
     }
 
     // MARK: Oynatıcı ayarları

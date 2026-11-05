@@ -13,18 +13,18 @@ extension BrowserViewController {
         #if DEBUG
         try? server.start()
         server.debugHandler = { [weak self] command, query in
-            guard let self, let e = self.engine else { return "motor yok" }
+            guard let self, let e = self.engine else { return "no engine" }
             switch command {
             case "jsbench":
                 return e.js(Pages.jsBenchmark) ?? "-"
             case "open":
                 if let u = query["url"] { self.open(u) }
-                return "açılıyor: \(query["url"] ?? "")"
+                return "opening: \(query["url"] ?? "")"
             case "perf":
                 let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("perf.txt")
-                return (try? String(contentsOf: url, encoding: .utf8)) ?? "(boş)"
+                return (try? String(contentsOf: url, encoding: .utf8)) ?? "(empty)"
             default:
-                return "komutlar: jsbench, open?url=, perf"
+                return "commands: jsbench, open?url=, perf"
             }
         }
         #endif
@@ -35,7 +35,7 @@ extension BrowserViewController {
             try RemoteServer.shared.start()
             store.remoteEnabled = true
         } catch {
-            showToast("Sunucu başlatılamadı: \(error.localizedDescription)")
+            showToast(L("Couldn't start the server: %@", error.localizedDescription), symbol: "exclamationmark.triangle.fill")
             return
         }
         let vc = RemoteInfoViewController()
@@ -43,7 +43,7 @@ extension BrowserViewController {
         vc.onDisable = { [weak self] in
             RemoteServer.shared.stop()
             self?.store.remoteEnabled = false
-            self?.showToast("Telefondan kontrol kapatıldı")
+            self?.showToast(L("Phone control turned off"), symbol: "iphone.slash")
         }
         present(vc, animated: true)
     }
@@ -57,11 +57,15 @@ extension BrowserViewController {
             if newTab { addTab(url: url, activate: true) } else { open(url.absoluteString) }
         case let .type(text, submit):
             // Açık bir metin kutusu (adres, form alanı, arama) varsa oraya yaz; yoksa sayfadaki son seçilen alana.
-            if let alert = modal as? UIAlertController, let field = alert.textFields?.first {
+            if let search = modal as? UISearchContainerViewController {
+                search.searchController.searchBar.text = text
+                (search.searchController.searchResultsUpdater as? SearchSuggestionsController)?.update(query: text)
+                if submit { search.dismiss(animated: true) { [weak self] in self?.open(text) } }
+            } else if let alert = modal as? UIAlertController, let field = alert.textFields?.first {
                 field.text = text
             } else if modal == nil {
                 engine?.evaluate(Pages.setFieldValue(text, submit: submit), in: fieldFrame)
-                showToast(submit ? "Telefondan yazıldı ve gönderildi" : "Telefondan yazıldı")
+                showToast(submit ? L("Typed and sent from the phone") : L("Typed from the phone"), symbol: "iphone")
             }
         case let .move(dx, dy):
             guard modal == nil else { return }
@@ -73,7 +77,7 @@ extension BrowserViewController {
             clickAtCursor()
         case let .scroll(dy):
             guard modal == nil else { return }
-            scrollPage(by: CGPoint(x: 0, y: dy), animated: abs(dy) > 200)
+            smoothScroll(by: CGPoint(x: 0, y: dy))
         case .back:
             if let modal { modal.dismiss(animated: true); return }
             guard let t = activeTab else { return }

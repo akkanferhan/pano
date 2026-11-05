@@ -7,6 +7,9 @@ struct PlaybackContext {
     var title: String
     var nextEpisode: URL?
     var nextEpisodeGuessed = false
+    /// Bu videonun kimliği (Store.videoKey) ve aynı sayfadaki yarım kalmış kayıtlar.
+    var videoKey: String?
+    var resumeCandidates: [WatchProgress] = []
 }
 
 /// tvOS oynatıcısı + Pano eklemeleri:
@@ -35,6 +38,10 @@ final class VideoPlayerController: AVPlayerViewController {
     private var countdown: Timer?
     private var lastProgressReport: Double = 0
     private var showingNextAction = false
+    private var resumeChecked = false
+    private var resumeOffer: WatchProgress?
+    private var resumeOfferUntil: Double = 0
+    private var shownActions = ""
     private var closed = false
 
     /// Not: `player` ataması AVPlayerViewController'ın görünümünü hemen yükler (viewDidLoad çalışır);
@@ -58,7 +65,7 @@ final class VideoPlayerController: AVPlayerViewController {
                                                                  object: player.currentItem, queue: .main) {
                 [weak self] _ in self?.playbackEnded()
             }
-            selectEmbeddedTurkish(in: player)
+            selectEmbeddedPreferred(in: player)
         }
         loadSources()
         rebuildMenus()
@@ -94,11 +101,19 @@ final class VideoPlayerController: AVPlayerViewController {
             lastProgressReport = seconds
             onProgress?(seconds, duration)
         }
-        // Son 2 dakikada ekranda "Sonraki bölüm" düğmesi
+        checkResume(at: seconds)
+        // Ekrandaki düğme: başta "Kaldığın yerden devam", son 2 dakikada "Sonraki bölüm"
         let nearEnd = context.nextEpisode != nil && duration > 0 && duration - seconds < 120
-        if nearEnd != showingNextAction {
-            showingNextAction = nearEnd
-            contextualActions = nearEnd ? [nextEpisodeAction()] : []
+        showingNextAction = nearEnd
+        let offerActive = resumeOffer != nil && seconds < resumeOfferUntil
+        let wanted = offerActive ? "resume" : (nearEnd ? "next" : "")
+        if wanted != shownActions {
+            shownActions = wanted
+            switch wanted {
+            case "resume": contextualActions = [resumeAction()]
+            case "next": contextualActions = [nextEpisodeAction()]
+            default: contextualActions = []
+            }
         }
     }
 
@@ -190,7 +205,7 @@ final class VideoPlayerController: AVPlayerViewController {
         }
         guard !duplicate else { return }
         tracks.append(track)
-        if select || (current == nil && Subtitles.isTurkish(track)) { self.select(track, announce: true) }
+        if select || (current == nil && Subtitles.isPreferred(track)) { self.select(track, announce: true) }
         rebuildMenus()
     }
 
@@ -204,19 +219,20 @@ final class VideoPlayerController: AVPlayerViewController {
         cueIndex = 0
         refreshSubtitle()
         rebuildMenus()
-        if announce, let track { flash("Altyazı: \(track.label)") }
+        if announce, let track { flash(L("Subtitles: %@", track.label)) }
     }
 
     /// HLS akışının içinde Türkçe altyazı varsa ve harici altyazı seçilmediyse onu seçer.
-    private func selectEmbeddedTurkish(in player: AVPlayer) {
+    private func selectEmbeddedPreferred(in player: AVPlayer) {
         guard let item = player.currentItem else { return }
         Task { @MainActor [weak self] in
             guard let group = try? await item.asset.loadMediaSelectionGroup(for: .legible) else { return }
-            let turkish = group.options.first { option in
-                option.extendedLanguageTag?.lowercased().hasPrefix("tr") == true ||
-                    option.locale?.language.languageCode?.identifier == "tr"
+            let want = AppLanguage.shortCode
+            let preferred = group.options.first { option in
+                option.extendedLanguageTag?.lowercased().hasPrefix(want) == true ||
+                    option.locale?.language.languageCode?.identifier == want
             }
-            if let turkish, self?.current == nil { item.select(turkish, in: group) }
+            if let preferred, self?.current == nil { item.select(preferred, in: group) }
         }
     }
 
@@ -224,56 +240,82 @@ final class VideoPlayerController: AVPlayerViewController {
 
     private func searchOnline() {
         guard OpenSubtitles.isConfigured else {
-            alert("OpenSubtitles API anahtarı gerekli",
-                  "Pano menüsü → Ayarlar → OpenSubtitles API anahtarı. Anahtarı opensubtitles.com/consumers adresinden ücretsiz alabilirsin.")
+            alert(L("OpenSubtitles API key required"),
+                  L("Pano menu → Settings → OpenSubtitles. You can get a free key at opensubtitles.com/consumers."))
             return
         }
         let ep = OpenSubtitles.episode(from: context.title + " " + (context.pageURL ?? ""))
-        var message = "Türkçe altyazı aranacak"
-        if let s = ep.season, let e = ep.episode { message += " · \(s). sezon \(e). bölüm" }
-        let prompt = UIAlertController(title: "Altyazı ara (OpenSubtitles)", message: message, preferredStyle: .alert)
+        var message = L("Searching for %@ subtitles", Locale.current.localizedString(forLanguageCode: AppLanguage.shortCode) ?? AppLanguage.shortCode)
+        if let s = ep.season, let e = ep.episode { message += " · " + L("Season %d, episode %d", s, e) }
+        let prompt = UIAlertController(title: L("Search subtitles (OpenSubtitles)"), message: message, preferredStyle: .alert)
         prompt.addTextField { [context] tf in
             tf.text = OpenSubtitles.cleanTitle(context.title)
-            tf.placeholder = "Film / dizi adı"
+            tf.placeholder = L("Movie / series name")
         }
-        prompt.addAction(UIAlertAction(title: "Ara", style: .default) { [weak self, weak prompt] _ in
+        prompt.addAction(UIAlertAction(title: L("Search"), style: .default) { [weak self, weak prompt] _ in
             let q = prompt?.textFields?.first?.text?.trimmingCharacters(in: .whitespaces) ?? ""
             guard !q.isEmpty else { return }
-            self?.flash("Aranıyor: \(q)…")
+            self?.flash(L("Searching: %@…", q))
             OpenSubtitles.search(query: q, season: ep.season, episode: ep.episode) { items, error in
                 self?.showResults(items, error: error, query: q)
             }
         })
-        prompt.addAction(UIAlertAction(title: "Vazgeç", style: .cancel))
+        prompt.addAction(UIAlertAction(title: L("Cancel"), style: .cancel))
         present(prompt, animated: true)
     }
 
     private func showResults(_ items: [OpenSubtitles.Item], error: String?, query: String) {
-        if let error { return alert("Arama başarısız", error) }
-        guard !items.isEmpty else { return alert("Sonuç yok", "“\(query)” için Türkçe altyazı bulunamadı.") }
-        let sheet = UIAlertController(title: "Türkçe altyazılar", message: query, preferredStyle: .actionSheet)
+        if let error { return alert(L("Search failed"), error) }
+        guard !items.isEmpty else { return alert(L("No results"), L("No subtitles found for “%@”.", query)) }
+        let sheet = UIAlertController(title: L("Subtitles"), message: query, preferredStyle: .actionSheet)
         for item in items.prefix(25) {
             sheet.addAction(UIAlertAction(title: "\(item.release)  ·  ⬇︎\(item.downloads)", style: .default) { [weak self] _ in
-                self?.flash("İndiriliyor…")
+                self?.flash(L("Downloading…"))
                 OpenSubtitles.download(item) { cues, error in
                     guard let self else { return }
                     if let cues {
                         let label = "OpenSubtitles: " + String(item.release.prefix(40))
                         self.add(SubtitleTrack(label: label, language: "tr", cues: cues, source: "os:\(item.fileID)"), select: true)
                     } else {
-                        self.alert("İndirilemedi", error ?? "Bilinmeyen hata")
+                        self.alert(L("Download failed"), error ?? L("Unknown error"))
                     }
                 }
             })
         }
-        sheet.addAction(UIAlertAction(title: "Vazgeç", style: .cancel))
+        sheet.addAction(UIAlertAction(title: L("Cancel"), style: .cancel))
         present(sheet, animated: true)
+    }
+
+    // MARK: Kaldığın yerden devam
+
+    /// Video süresi belli olunca bir kez: aynı sayfadaki kayıtlardan *bu videoya* ait olanı bul.
+    /// Eşleşme: video kimliği aynı ya da (adres oturuma göre değişiyorsa) süre ±3 sn içinde aynı.
+    private func checkResume(at seconds: Double) {
+        guard !resumeChecked, duration > 0 else { return }
+        resumeChecked = true
+        let match = context.resumeCandidates.first { entry in
+            if let key = entry.videoKey, key == context.videoKey { return true }
+            return entry.duration > 0 && abs(entry.duration - duration) < 3
+        }
+        guard let match, match.position > 30, match.position < duration - 60, seconds < 15 else { return }
+        resumeOffer = match
+        resumeOfferUntil = seconds + 20
+        flash(L("Continue from %@?", BrowserViewController.clock(match.position)))
+    }
+
+    private func resumeAction() -> UIAction {
+        let time = BrowserViewController.clock(resumeOffer?.position ?? 0)
+        return UIAction(title: L("Resume · %@", time), image: UIImage(systemName: "clock.arrow.circlepath")) { [weak self] _ in
+            guard let self, let offer = self.resumeOffer else { return }
+            self.resumeOffer = nil
+            self.player?.seek(to: CMTime(seconds: offer.position, preferredTimescale: 600))
+        }
     }
 
     // MARK: Sonraki bölüm
 
     private func nextEpisodeAction() -> UIAction {
-        UIAction(title: "Sonraki bölüm", image: UIImage(systemName: "forward.end.fill")) { [weak self] _ in
+        UIAction(title: L("Next episode"), image: UIImage(systemName: "forward.end.fill")) { [weak self] _ in
             self?.goToNextEpisode()
         }
     }
@@ -284,7 +326,7 @@ final class VideoPlayerController: AVPlayerViewController {
         countdownLabel.isHidden = false
         let update = { [weak self] in
             guard let self, let overlay = self.contentOverlayView else { return }
-            self.countdownLabel.setText("Sonraki bölüm \(remaining) sn içinde · iptal: Menü", symbol: "forward.end.fill", size: 30)
+            self.countdownLabel.setText(L("Next episode in %d s · Menu to cancel", remaining), symbol: "forward.end.fill", size: 30)
             self.countdownLabel.frame.origin = CGPoint(x: overlay.bounds.width - self.countdownLabel.frame.width - 80, y: 150)
         }
         update()
@@ -313,7 +355,7 @@ final class VideoPlayerController: AVPlayerViewController {
     private func rebuildMenus() {
         var items: [UIMenuElement] = [subtitleMenu(), speedMenu(), skipMenu()]
         if context.nextEpisode != nil {
-            items.append(UIAction(title: context.nextEpisodeGuessed ? "Sonraki bölüm (tahmini)" : "Sonraki bölüm",
+            items.append(UIAction(title: context.nextEpisodeGuessed ? L("Next episode (guessed)") : L("Next episode"),
                                   image: UIImage(systemName: "forward.end.fill")) { [weak self] _ in
                 self?.goToNextEpisode()
             })
@@ -322,21 +364,21 @@ final class VideoPlayerController: AVPlayerViewController {
     }
 
     private func subtitleMenu() -> UIMenu {
-        let off = UIAction(title: "Kapalı", state: current == nil ? .on : .off) { [weak self] _ in self?.select(nil) }
+        let off = UIAction(title: L("Off"), state: current == nil ? .on : .off) { [weak self] _ in self?.select(nil) }
         var list: [UIMenuElement] = tracks.map { track in
-            UIAction(title: track.label, subtitle: "\(track.cues.count) satır",
+            UIAction(title: track.label, subtitle: L("%d lines", track.cues.count),
                      state: current?.source == track.source ? .on : .off) { [weak self] _ in
                 self?.select(track, announce: true)
             }
         }
         if tracks.isEmpty {
-            list = [UIAction(title: loading > 0 ? "Yükleniyor…" : "Sitede altyazı bulunamadı", attributes: .disabled) { _ in }]
+            list = [UIAction(title: loading > 0 ? L("Loading…") : L("No subtitles found on the site"), attributes: .disabled) { _ in }]
         }
-        let online = UIAction(title: "İnternetten bul (OpenSubtitles)…", image: UIImage(systemName: "magnifyingglass")) {
+        let online = UIAction(title: L("Find online (OpenSubtitles)…"), image: UIImage(systemName: "magnifyingglass")) {
             [weak self] _ in self?.searchOnline()
         }
         let tools = UIMenu(title: "", options: .displayInline, children: [online, timingMenu(), appearanceMenu()])
-        return UIMenu(title: "Altyazı", image: UIImage(systemName: "captions.bubble"), children: [off] + list + [tools])
+        return UIMenu(title: L("Subtitles"), image: UIImage(systemName: "captions.bubble"), children: [off] + list + [tools])
     }
 
     private func timingMenu() -> UIMenu {
@@ -344,58 +386,58 @@ final class VideoPlayerController: AVPlayerViewController {
             UIAction(title: String(format: "%+.1f sn", step)) { [weak self] _ in
                 guard let self else { return }
                 self.offset += step
-                self.flash(String(format: "Altyazı gecikmesi: %+.1f sn", self.offset))
+                self.flash(L("Subtitle delay: %+.1f s", self.offset))
                 self.refreshSubtitle()
                 self.rebuildMenus()
             }
         }
-        items.append(UIAction(title: "Sıfırla") { [weak self] _ in
+        items.append(UIAction(title: L("Reset")) { [weak self] _ in
             self?.offset = 0
-            self?.flash("Altyazı gecikmesi sıfırlandı")
+            self?.flash(L("Subtitle delay reset"))
             self?.rebuildMenus()
         })
-        return UIMenu(title: String(format: "Zamanlama (%+.1f sn)", offset), image: UIImage(systemName: "clock.arrow.2.circlepath"),
+        return UIMenu(title: L("Timing (%+.1f s)", offset), image: UIImage(systemName: "clock.arrow.2.circlepath"),
                       children: items)
     }
 
     private func appearanceMenu() -> UIMenu {
-        let sizes: [(String, Double)] = [("Küçük", 36), ("Normal", 46), ("Büyük", 58), ("Çok büyük", 72)]
-        let size = UIMenu(title: "Boyut", children: sizes.map { name, value in
+        let sizes: [(String, Double)] = [(L("Small"), 36), (L("Normal"), 46), (L("Large"), 58), (L("Extra large"), 72)]
+        let size = UIMenu(title: L("Size"), children: sizes.map { name, value in
             UIAction(title: name, state: store.subtitleFontSize == value ? .on : .off) { [weak self] _ in
                 self?.store.subtitleFontSize = value
                 self?.refreshSubtitle()
                 self?.rebuildMenus()
             }
         })
-        let colors: [(String, String)] = [("Beyaz", "white"), ("Sarı", "yellow")]
-        let color = UIMenu(title: "Renk", children: colors.map { name, value in
+        let colors: [(String, String)] = [(L("White"), "white"), (L("Yellow"), "yellow")]
+        let color = UIMenu(title: L("Color"), children: colors.map { name, value in
             UIAction(title: name, state: store.subtitleColor == value ? .on : .off) { [weak self] _ in
                 self?.store.subtitleColor = value
                 self?.refreshSubtitle()
                 self?.rebuildMenus()
             }
         })
-        let backgrounds = ["Yok (kenarlıklı)", "Yarı saydam kutu", "Siyah kutu"]
-        let background = UIMenu(title: "Arka plan", children: backgrounds.enumerated().map { i, name in
+        let backgrounds = [L("None (outlined)"), L("Translucent box"), L("Black box")]
+        let background = UIMenu(title: L("Background"), children: backgrounds.enumerated().map { i, name in
             UIAction(title: name, state: store.subtitleBackground == i ? .on : .off) { [weak self] _ in
                 self?.store.subtitleBackground = i
                 self?.refreshSubtitle()
                 self?.rebuildMenus()
             }
         })
-        return UIMenu(title: "Görünüm", image: UIImage(systemName: "textformat.size"), children: [size, color, background])
+        return UIMenu(title: L("Appearance"), image: UIImage(systemName: "textformat.size"), children: [size, color, background])
     }
 
     private func speedMenu() -> UIMenu {
         let rates: [Double] = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
-        return UIMenu(title: "Hız", image: UIImage(systemName: "speedometer"), children: rates.map { rate in
-            UIAction(title: rate == 1 ? "Normal (1×)" : String(format: "%g×", rate),
+        return UIMenu(title: L("Speed"), image: UIImage(systemName: "speedometer"), children: rates.map { rate in
+            UIAction(title: rate == 1 ? L("Normal (1×)") : String(format: "%g×", rate),
                      state: store.playbackRate == rate ? .on : .off) { [weak self] _ in
                 guard let self, let player = self.player else { return }
                 self.store.playbackRate = rate
                 player.defaultRate = Float(rate)
                 if player.timeControlStatus != .paused { player.rate = Float(rate) }
-                self.flash(rate == 1 ? "Normal hız" : String(format: "Hız: %g×", rate))
+                self.flash(rate == 1 ? L("Normal speed") : L("Speed: %g×", rate))
                 self.rebuildMenus()
             }
         })
@@ -404,16 +446,16 @@ final class VideoPlayerController: AVPlayerViewController {
     private func skipMenu() -> UIMenu {
         let step = Double(store.skipStep)
         let steps = [10, 15, 30, 60]
-        let stepMenu = UIMenu(title: "Adım: \(store.skipStep) sn", children: steps.map { s in
-            UIAction(title: "\(s) sn", state: store.skipStep == s ? .on : .off) { [weak self] _ in
+        let stepMenu = UIMenu(title: L("Step: %d s", store.skipStep), children: steps.map { s in
+            UIAction(title: L("%d s", s), state: store.skipStep == s ? .on : .off) { [weak self] _ in
                 self?.store.skipStep = s
                 self?.rebuildMenus()
             }
         })
-        return UIMenu(title: "Sar", image: UIImage(systemName: "goforward"), children: [
-            UIAction(title: "−\(Int(step)) sn", image: UIImage(systemName: "gobackward")) { [weak self] _ in self?.seek(by: -step) },
-            UIAction(title: "+\(Int(step)) sn", image: UIImage(systemName: "goforward")) { [weak self] _ in self?.seek(by: step) },
-            UIAction(title: "Jeneriği atla (+85 sn)", image: UIImage(systemName: "forward.fill")) { [weak self] _ in self?.seek(by: 85) },
+        return UIMenu(title: L("Skip"), image: UIImage(systemName: "goforward"), children: [
+            UIAction(title: L("−%d s", Int(step)), image: UIImage(systemName: "gobackward")) { [weak self] _ in self?.seek(by: -step) },
+            UIAction(title: L("+%d s", Int(step)), image: UIImage(systemName: "goforward")) { [weak self] _ in self?.seek(by: step) },
+            UIAction(title: L("Skip intro (+85 s)"), image: UIImage(systemName: "forward.fill")) { [weak self] _ in self?.seek(by: 85) },
             stepMenu,
         ])
     }
@@ -430,17 +472,14 @@ final class VideoPlayerController: AVPlayerViewController {
 
     private func alert(_ title: String, _ message: String) {
         let a = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        a.addAction(UIAlertAction(title: "Tamam", style: .default))
+        a.addAction(UIAlertAction(title: L("OK"), style: .default))
         present(a, animated: true)
     }
 
     /// Kısa bilgi (sağ üstte cam kapsül, 2 sn).
     private func flash(_ text: String) {
         guard let overlay = contentOverlayView else { return }
-        let t = text.lowercased()
-        let symbol = t.contains("altyazı") ? "captions.bubble.fill" : t.contains("hız") ? "speedometer"
-            : t.contains("indir") || t.contains("aran") ? "magnifyingglass" : t.hasPrefix("+") ? "goforward"
-            : t.hasPrefix("−") ? "gobackward" : "info.circle.fill"
+        let symbol = text.hasPrefix("+") ? "goforward" : text.hasPrefix("−") ? "gobackward" : "info.circle.fill"
         let capsule = GlassCapsule(text: text, symbol: symbol)
         capsule.frame.origin = CGPoint(x: overlay.bounds.width - capsule.frame.width - 80, y: 70)
         capsule.alpha = 0

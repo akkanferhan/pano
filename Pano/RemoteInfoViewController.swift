@@ -33,9 +33,9 @@ final class RemoteInfoViewController: UIViewController {
             badgeBG.widthAnchor.constraint(equalToConstant: 76), badgeBG.heightAnchor.constraint(equalToConstant: 76),
             badge.centerXAnchor.constraint(equalTo: badgeBG.centerXAnchor), badge.centerYAnchor.constraint(equalTo: badgeBG.centerYAnchor),
         ])
-        let title = label("Telefondan kontrol", size: 58, weight: .heavy)
-        let info = label("iPhone kamerasıyla QR kodu okut. Telefon ve Apple TV aynı Wi-Fi ağında olmalı.\n" +
-                         "Telefondan adres gönderebilir, metin yazabilir, dokunmatik alanla imleci yönetebilirsin.",
+        let title = label(L("Phone control"), size: 58, weight: .heavy)
+        let info = label(L("Scan the QR code with your iPhone camera. The phone and Apple TV must be on the same Wi-Fi network.") + "\n" +
+                         L("From the phone you can send addresses, type text and move the cursor with the touch pad."),
                          size: 28, weight: .regular, color: UIColor(white: 1, alpha: 0.7))
         let qr = UIImageView()
         qr.contentMode = .scaleAspectFit
@@ -45,17 +45,17 @@ final class RemoteInfoViewController: UIViewController {
         qr.layer.masksToBounds = true
 
         let address = server.address
-        let addressLabel = label(address ?? "Ağ adresi bulunamadı — Apple TV Wi-Fi/Ethernet'e bağlı mı?",
+        let addressLabel = label(address ?? L("No network address found — is the Apple TV connected to Wi-Fi/Ethernet?"),
                                  size: 34, weight: .semibold)
         let pinLabel = UILabel()
-        pinLabel.attributedText = Theme.label("PIN  \(server.pin)", symbol: "lock.fill", size: 28, color: UIColor(white: 1, alpha: 0.7))
+        pinLabel.attributedText = Theme.label(L("PIN") + "  \(server.pin)", symbol: "lock.fill", size: 28, color: UIColor(white: 1, alpha: 0.7))
         if let address { qr.image = Self.qrImage(address) }
 
         let close = UIButton(type: .system)
-        close.setTitle("Kapat", for: .normal)
+        close.setTitle(L("Close"), for: .normal)
         close.addAction(UIAction { [weak self] _ in self?.dismiss(animated: true) }, for: .primaryActionTriggered)
         let disable = UIButton(type: .system)
-        disable.setTitle("Telefondan kontrolü kapat", for: .normal)
+        disable.setTitle(L("Turn off phone control"), for: .normal)
         disable.addAction(UIAction { [weak self] _ in
             self?.dismiss(animated: true) { self?.onDisable?() }
         }, for: .primaryActionTriggered)

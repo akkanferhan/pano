@@ -68,9 +68,9 @@ final class TabSwitcherController: UIViewController, UICollectionViewDataSource,
     #if DEBUG
     /// Oynat/Duraklat ile aynı yol (odaktaki kart).
     func debugCloseFocused() -> String {
-        guard let i = focusedTabIndex else { return "odakta sekme yok" }
+        guard let i = focusedTabIndex else { return "no focused tab" }
         closeTab(at: i)
-        return "kapatıldı: \(i)"
+        return "closed: \(i)"
     }
     #endif
 
@@ -95,17 +95,17 @@ final class TabSwitcherController: UIViewController, UICollectionViewDataSource,
         guard g.state == .began, let i = focusedTabIndex else { return }
         let card = cards[i]
         let panel = MenuPanelController(title: card.title, subtitle: card.host)
-        panel.addItem("Sekmeye geç", symbol: "arrow.right.circle") { [weak self] in
+        panel.addItem(L("Switch to tab"), symbol: "arrow.right.circle") { [weak self] in
             self?.dismiss(animated: true) { [onSelect = self?.onSelect] in onSelect?(i) }
         }
-        panel.addItem("Sekmeyi kapat", symbol: "xmark.square", destructive: true) { [weak self] in self?.closeTab(at: i) }
+        panel.addItem(L("Close tab"), symbol: "xmark.square", destructive: true) { [weak self] in self?.closeTab(at: i) }
         if cards.count > 1 {
-            panel.addItem("Diğer sekmeleri kapat", symbol: "xmark.square", destructive: true) { [weak self] in
+            panel.addItem(L("Close other tabs"), symbol: "xmark.square", destructive: true) { [weak self] in
                 guard let self else { return }
                 for j in stride(from: self.cards.count - 1, through: 0, by: -1) where j != i { self.closeTab(at: j) }
             }
         }
-        present(panel, animated: false)
+        present(panel, animated: true)
     }
 
     override func viewDidLayoutSubviews() {
@@ -116,19 +116,19 @@ final class TabSwitcherController: UIViewController, UICollectionViewDataSource,
     }
 
     private func updateTitle() {
-        titleLabel.text = cards.count == 1 ? "1 sekme" : "\(cards.count) sekme"
+        titleLabel.text = cards.count == 1 ? L("1 tab") : L("%d tabs", cards.count)
     }
 
     private func hint() -> NSAttributedString {
         let s = NSMutableAttributedString()
-        s.append(Theme.label("Seç", symbol: "hand.tap.fill", size: 22, color: Theme.textSecondary))
-        s.append(NSAttributedString(string: "  sekmeye geç      "))
-        s.append(Theme.label("Oynat/Duraklat", symbol: "playpause.fill", size: 22, color: Theme.textSecondary))
-        s.append(NSAttributedString(string: "  kapat      "))
-        s.append(Theme.label("Basılı tut", symbol: "hand.point.up.left.fill", size: 22, color: Theme.textSecondary))
-        s.append(NSAttributedString(string: "  seçenekler      "))
-        s.append(Theme.label("Menü", symbol: "chevron.backward.circle.fill", size: 22, color: Theme.textSecondary))
-        s.append(NSAttributedString(string: "  geri"))
+        s.append(Theme.label(L("Select"), symbol: "hand.tap.fill", size: 22, color: Theme.textSecondary))
+        s.append(NSAttributedString(string: "  " + L("switch to tab") + "      "))
+        s.append(Theme.label(L("Play/Pause"), symbol: "playpause.fill", size: 22, color: Theme.textSecondary))
+        s.append(NSAttributedString(string: "  " + L("close") + "      "))
+        s.append(Theme.label(L("Hold"), symbol: "hand.point.up.left.fill", size: 22, color: Theme.textSecondary))
+        s.append(NSAttributedString(string: "  " + L("options") + "      "))
+        s.append(Theme.label(L("Menu"), symbol: "chevron.backward.circle.fill", size: 22, color: Theme.textSecondary))
+        s.append(NSAttributedString(string: "  " + L("back")))
         s.addAttributes([.font: UIFont.systemFont(ofSize: 22, weight: .medium), .foregroundColor: Theme.textSecondary],
                         range: NSRange(location: 0, length: s.length))
         return s
@@ -212,7 +212,7 @@ final class TabCardCell: UICollectionViewCell {
         contentView.addSubview(title)
         contentView.addSubview(host)
         contentView.addSubview(badge)
-        closeHint.attributedText = Theme.label("Kapat", symbol: "playpause.fill", size: 18)
+        closeHint.attributedText = Theme.label(L("Close"), symbol: "playpause.fill", size: 18)
         closeHint.backgroundColor = UIColor(white: 0, alpha: 0.7)
         closeHint.alpha = 0
         contentView.addSubview(closeHint)
@@ -242,7 +242,7 @@ final class TabCardCell: UICollectionViewCell {
         title.text = card.title
         host.text = card.host
         badge.isHidden = !card.isCurrent
-        badge.attributedText = Theme.label("Şu an", symbol: "checkmark.circle.fill", size: 19)
+        badge.attributedText = Theme.label(L("Current"), symbol: "checkmark.circle.fill", size: 19)
         badge.backgroundColor = Theme.violet.withAlphaComponent(0.92)
         isTab = true
         setNeedsLayout()
@@ -252,8 +252,8 @@ final class TabCardCell: UICollectionViewCell {
         preview.image = nil
         placeholder.isHidden = false
         symbol.image = Theme.symbol("plus", size: 80, weight: .light)
-        title.text = "Yeni sekme"
-        host.text = "Ana sayfayı aç"
+        title.text = L("New tab")
+        host.text = L("Open the home page")
         badge.isHidden = true
         isTab = false
     }

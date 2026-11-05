@@ -88,18 +88,18 @@ final class RemoteServer {
     private func respond(to r: HTTPRequest) -> Data {
         #if DEBUG
         if r.method == "GET", r.path.hasPrefix("/debug/") {
-            let out = debugHandler?(String(r.path.dropFirst(7)), r.query) ?? "yok"
+            let out = debugHandler?(String(r.path.dropFirst(7)), r.query) ?? "none"
             return Self.http(200, "text/plain; charset=utf-8", out)
         }
         #endif
         guard r.query["k"] == pin else {
             return Self.http(403, "text/html; charset=utf-8",
-                             "<meta name=viewport content='width=device-width'><h2 style='font-family:sans-serif'>Pano: PIN hatalı. Apple TV'deki QR kodu yeniden okut.</h2>")
+                             "<meta name=viewport content='width=device-width'><h2 style='font-family:sans-serif'>" + RemotePage.h(L("Pano: wrong PIN. Scan the QR code on the Apple TV again.")) + "</h2>")
         }
         if r.method == "GET" && r.path == "/" {
-            return Self.http(200, "text/html; charset=utf-8", RemotePage.html)
+            return Self.http(200, "text/html; charset=utf-8", RemotePage.html())
         }
-        guard r.method == "POST", r.path.hasPrefix("/api/") else { return Self.http(404, "text/plain", "yok") }
+        guard r.method == "POST", r.path.hasPrefix("/api/") else { return Self.http(404, "text/plain", "not found") }
         let body = (try? JSONSerialization.jsonObject(with: r.body)) as? [String: Any] ?? [:]
         let num = { (k: String) in (body[k] as? NSNumber)?.doubleValue ?? 0 }
         switch r.path.dropFirst(5) {
@@ -113,7 +113,7 @@ final class RemoteServer {
         case "menu": handler?(.menu)
         case "playpause": handler?(.playPause)
         case "state": break
-        default: return Self.http(404, "text/plain", "yok")
+        default: return Self.http(404, "text/plain", "not found")
         }
         let state = stateProvider?() ?? [:]
         let json = (try? JSONSerialization.data(withJSONObject: state)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
@@ -181,10 +181,17 @@ private struct HTTPRequest {
 
 /// Telefonda açılan kontrol sayfası.
 enum RemotePage {
-    static let html = #"""
-    <!doctype html><html lang="tr"><head><meta charset="utf-8">
+    static func h(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
+    }
+
+    private static func j(_ s: String) -> String { Pages.jsString(s) }
+
+    static func html() -> String { #"""
+    <!doctype html><html lang="\#(AppLanguage.current)" dir="\#(AppLanguage.current.hasPrefix("ar") ? "rtl" : "ltr")"><head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes"><title>Pano Kumanda</title>
+    <meta name="apple-mobile-web-app-capable" content="yes"><title>\#(h(L("Pano Remote")))</title>
     <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     body{margin:0;font-family:-apple-system,sans-serif;color:#f4f5fa;padding:18px;padding-bottom:30px;min-height:100vh;background:radial-gradient(500px 400px at 0% 0%,rgba(124,58,237,.55),transparent 70%),radial-gradient(500px 420px at 100% 100%,rgba(236,72,153,.4),transparent 70%),#07070f;background-attachment:fixed}
@@ -198,26 +205,26 @@ enum RemotePage {
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
     .sec{font-size:13px;color:#8a93a6;margin:16px 0 8px;text-transform:uppercase;letter-spacing:.5px}
     </style></head><body>
-    <h1><i></i>Pano Kumanda</h1><div class="now" id="now">Bağlanıyor…</div>
-    <div class="sec">Adres / arama</div>
-    <div class="row"><input id="url" type="url" placeholder="site.com veya aranacak kelime" autocapitalize="off" autocorrect="off"></div>
-    <div class="row"><button class="p" style="flex:1" onclick="openUrl(false)">Aç</button><button style="flex:1" onclick="openUrl(true)">Yeni sekmede aç</button></div>
-    <div class="sec">Dokunmatik alan</div>
-    <div id="pad">Kaydır: imleç · Dokun: tıkla<br>İki parmak: sayfayı kaydır</div>
+    <h1><i></i>\#(h(L("Pano Remote")))</h1><div class="now" id="now">\#(h(L("Connecting…")))</div>
+    <div class="sec">\#(h(L("Address / search")))</div>
+    <div class="row"><input id="url" type="url" placeholder="\#(h(L("site.com or words to search")))" autocapitalize="off" autocorrect="off"></div>
+    <div class="row"><button class="p" style="flex:1" onclick="openUrl(false)">\#(h(L("Open")))</button><button style="flex:1" onclick="openUrl(true)">\#(h(L("Open in new tab")))</button></div>
+    <div class="sec">\#(h(L("Touch pad")))</div>
+    <div id="pad">\#(h(L("Swipe: cursor · Tap: click")))<br>\#(h(L("Two fingers: scroll the page")))</div>
     <div class="grid">
-      <button onclick="send('back')">◀︎ Geri</button><button onclick="send('scroll',{dy:-500})">▲ Yukarı</button><button onclick="send('home')">⌂ Ana sayfa</button>
-      <button onclick="send('menu')">☰ Menü</button><button onclick="send('scroll',{dy:500})">▼ Aşağı</button><button onclick="send('playpause')">⏯ Oynat/Dur</button>
+      <button onclick="send('back')">◀︎ \#(h(L("Back")))</button><button onclick="send('scroll',{dy:-500})">▲ \#(h(L("Up")))</button><button onclick="send('home')">⌂ \#(h(L("Home")))</button>
+      <button onclick="send('menu')">☰ \#(h(L("Menu")))</button><button onclick="send('scroll',{dy:500})">▼ \#(h(L("Down")))</button><button onclick="send('playpause')">⏯ \#(h(L("Play/Pause")))</button>
     </div>
-    <div class="sec">Metin yaz (seçili alana)</div>
-    <textarea id="text" placeholder="Önce TV'de bir metin alanına tıkla, sonra buraya yaz"></textarea>
-    <div class="row" style="margin-top:8px"><button style="flex:1" onclick="typeText(false)">Yaz</button><button class="p" style="flex:1" onclick="typeText(true)">Yaz ve gönder</button></div>
+    <div class="sec">\#(h(L("Type text (into the selected field)")))</div>
+    <textarea id="text" placeholder="\#(h(L("First click a text field on the TV, then type here")))"></textarea>
+    <div class="row" style="margin-top:8px"><button style="flex:1" onclick="typeText(false)">\#(h(L("Type")))</button><button class="p" style="flex:1" onclick="typeText(true)">\#(h(L("Type and send")))</button></div>
     <script>
     var K = new URLSearchParams(location.search).get('k');
     function send(cmd, body){
       return fetch('/api/' + cmd + '?k=' + K, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{})})
         .then(function(r){ return r.json(); }).then(function(s){
-          document.getElementById('now').textContent = s.title ? (s.title + (s.url ? ' — ' + s.url : '')) : 'Bağlı';
-        }).catch(function(){ document.getElementById('now').textContent = 'Bağlantı yok — Apple TV açık ve aynı ağda mı?'; });
+          document.getElementById('now').textContent = s.title ? (s.title + (s.url ? ' — ' + s.url : '')) : \#(j(L("Connected")));
+        }).catch(function(){ document.getElementById('now').textContent = \#(j(L("No connection — is the Apple TV on and on the same network?"))); });
     }
     function openUrl(newTab){ var u = document.getElementById('url'); if (!u.value.trim()) return; send('open', {url:u.value.trim(), newTab:newTab}); u.blur(); }
     function typeText(submit){ var t = document.getElementById('text'); send('type', {text:t.value, submit:submit}); if (submit) t.value=''; }
@@ -245,4 +252,5 @@ enum RemotePage {
     send('state');
     </script></body></html>
     """#
+    }
 }

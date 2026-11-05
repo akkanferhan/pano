@@ -1,5 +1,6 @@
 name: Pano
 options:
+  developmentLanguage: en
   bundleIdPrefix: com.ferhanakkan
   deploymentTarget:
     tvOS: "17.0"

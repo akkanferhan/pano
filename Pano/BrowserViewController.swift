@@ -29,12 +29,12 @@ final class BrowserViewController: UIViewController {
     private var lastTouch: CGPoint?
     private var lastTouchTime: TimeInterval = 0
     private var velocity: CGPoint = .zero
-    private var momentum: CADisplayLink?
+    private var smoothLink: CADisplayLink?
+    private var smoothTarget: CGPoint?
     private var selectHold: DispatchWorkItem?
     private var selectHoldFired = false
     private var playHold: DispatchWorkItem?
     private var playHoldFired = false
-    private var playSingle: DispatchWorkItem?
     private var hovering = false
     private var lastHoverCheck: TimeInterval = 0
 
@@ -133,7 +133,7 @@ final class BrowserViewController: UIViewController {
 
     private func showUnavailable() {
         let label = UILabel()
-        label.text = "Bu tvOS sürümünde web motoru (UIWebView) bulunamadı."
+        label.text = L("The web engine (UIWebView) is not available on this tvOS version.")
         label.textColor = .white
         label.font = .systemFont(ofSize: 34, weight: .medium)
         label.textAlignment = .center
@@ -144,7 +144,7 @@ final class BrowserViewController: UIViewController {
 
     func makeEngine(for tab: Tab) -> WebEngine {
         let e = WebEngine()!
-        if !e.setUserAgent(store.currentUA) { NSLog("Pano: kullanıcı ajanı ayarlanamadı") }
+        if !e.setUserAgent(store.currentUA) { NSLog("Pano: could not set the user agent") }
         e.view.isUserInteractionEnabled = false
         e.view.insetsLayoutMarginsFromSafeArea = false
         e.scrollView?.contentInsetAdjustmentBehavior = .never
@@ -193,7 +193,7 @@ final class BrowserViewController: UIViewController {
     @discardableResult
     func addTab(url: URL?, activate: Bool) -> Bool {
         guard tabs.count < Self.maxTabs else {
-            showToast("En fazla \(Self.maxTabs) sekme açılabilir")
+            showToast(L("You can open up to %d tabs", Self.maxTabs), symbol: "square.on.square")
             return false
         }
         let t = Tab()
@@ -285,7 +285,7 @@ final class BrowserViewController: UIViewController {
                 if let s = items.first(where: { $0.name == "url" })?.value, let target = URL(string: s) {
                     DispatchQueue.main.async {
                         if self.addTab(url: target, activate: false) {
-                            self.showToast("Yeni sekmede açıldı — sekmeler için Oynat/Duraklat'a basılı tut")
+                            self.showToast(L("Opened in a new tab — hold Play/Pause to see tabs"), symbol: "plus.square.on.square")
                         }
                     }
                 }
@@ -296,7 +296,7 @@ final class BrowserViewController: UIViewController {
         }
         if let scheme = url.scheme?.lowercased(),
            !["http", "https", "about", "data", "blob", "javascript", "applewebdata"].contains(scheme) {
-            DispatchQueue.main.async { self.showToast("Bu bağlantı türü açılamıyor: \(scheme)") }
+            DispatchQueue.main.async { self.showToast(L("This kind of link can't be opened: %@", scheme), symbol: "exclamationmark.triangle.fill") }
             return false
         }
         if request.mainDocumentURL == nil || request.mainDocumentURL == url { // ana çerçeve gezinmesi
@@ -327,7 +327,7 @@ final class BrowserViewController: UIViewController {
             t.perfOurTime += CFAbsoluteTimeGetCurrent() - perfT0
             if !t.engine.isLoading, !t.perfLogged, let u = t.url?.host {
                 t.perfLogged = true
-                let line = String(format: "%@ yükleme=%.2fs bitti-bildirimi=%d bizim-kod=%.0fms\n", u,
+                let line = String(format: "%@ load=%.2fs finish-events=%d our-code=%.0fms\n", u,
                                   Date().timeIntervalSince(t.perfStart), t.perfFinishes, t.perfOurTime * 1000)
                 Self.debugAppend("perf.txt", line)
             }
@@ -347,11 +347,11 @@ final class BrowserViewController: UIViewController {
         let url = e.currentURL
         t.isHome = marker == "home"
         if t.isHome {
-            t.title = "Ana Sayfa"
+            t.title = L("Home")
             t.url = nil
             t.pendingURL = nil
         } else if marker == "error" {
-            t.title = "Sayfa açılamadı"
+            t.title = L("Couldn't open the page")
         } else if let url {
             let title = e.title
             t.title = title.isEmpty ? (url.host ?? url.absoluteString) : title
@@ -380,11 +380,11 @@ final class BrowserViewController: UIViewController {
         let failing = (error.userInfo[NSURLErrorFailingURLStringErrorKey] as? String) ?? ""
         guard failing.isEmpty || failing == t.mainRequestURL else { return } // alt kaynak / iframe hatası
         if error.domain == AdBlocker.errorDomain {
-            if t === activeTab { showToast("Reklam/izleyici adresi engellendi") }
+            if t === activeTab { showToast(L("Blocked an ad/tracker address"), symbol: "shield.lefthalf.filled") }
             return
         }
         t.engine.loadHTML(Pages.error(url: failing, message: error.localizedDescription), baseURL: nil)
-        t.title = "Sayfa açılamadı"
+        t.title = L("Couldn't open the page")
         if t === activeTab {
             titleLabel.text = t.title
             hostLabel.text = failing
@@ -396,7 +396,7 @@ final class BrowserViewController: UIViewController {
     func loadHome(in t: Tab) {
         t.isHome = true
         t.url = nil
-        t.title = "Ana Sayfa"
+        t.title = L("Home")
         t.engine.loadHTML(Pages.home(bookmarks: store.bookmarks, engine: store.searchEngine, isPrivate: store.privateMode,
                                      continueWatching: store.watchProgress),
                           baseURL: nil)
@@ -432,7 +432,7 @@ final class BrowserViewController: UIViewController {
         let host: String
         let symbol: String
         if t.isHome {
-            host = store.privateMode ? "Pano · gizli gezinme" : "Pano"
+            host = store.privateMode ? L("Pano · private browsing") : "Pano"
             symbol = store.privateMode ? "eye.slash.fill" : "house.fill"
         } else {
             host = url.map { ($0.host ?? $0.absoluteString) + ($0.path.count > 1 ? $0.path : "") } ?? ""
@@ -457,7 +457,8 @@ final class BrowserViewController: UIViewController {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
-        stopMomentum()
+        // Kaydırma modunda yeni dokunuş süzülmeyi durdurur (parmak sayfayı "yakalar")
+        if mode == .scroll, let sv = engine?.scrollView { smoothTarget = sv.contentOffset }
         lastTouch = touch.location(in: view)
         lastTouchTime = touch.timestamp
         velocity = .zero
@@ -483,14 +484,19 @@ final class BrowserViewController: UIViewController {
         case .scroll:
             let f = 1.6 * store.cursorSpeed
             let d = CGPoint(x: delta.x * f, y: delta.y * f)
-            scrollPage(by: d)
-            velocity = CGPoint(x: d.x / dt, y: d.y / dt)
+            smoothScroll(by: d)
+            // hız: üstel ortalama (ani sıçramalar yumuşasın)
+            let v = CGPoint(x: d.x / dt, y: d.y / dt)
+            velocity = CGPoint(x: velocity.x * 0.6 + v.x * 0.4, y: velocity.y * 0.6 + v.y * 0.4)
         }
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         lastTouch = nil
-        if mode == .scroll, hypot(velocity.x, velocity.y) > 200 { startMomentum() }
+        // Parmak kalkınca süzülme: hedefi hızla orantılı ileri taşı, yumuşatıcı yavaşlayarak götürür
+        if mode == .scroll, hypot(velocity.x, velocity.y) > 200 {
+            smoothScroll(by: CGPoint(x: velocity.x * 0.28, y: velocity.y * 0.28))
+        }
         if mode == .cursor { checkHover() }
     }
 
@@ -506,7 +512,8 @@ final class BrowserViewController: UIViewController {
         cursor.center = clamped
         if clamped.y < 150 { showChrome() }
         let overflow = CGPoint(x: target.x - clamped.x, y: target.y - clamped.y)
-        if overflow != .zero { scrollPage(by: CGPoint(x: overflow.x * 2.5, y: overflow.y * 2.5)) }
+        // Kenara itince yumuşak kaydırma: ne kadar itilirse o kadar hızlı
+        if overflow != .zero { smoothScroll(by: CGPoint(x: overflow.x * 3, y: overflow.y * 3)) }
     }
 
     func checkHover() {
@@ -547,23 +554,40 @@ final class BrowserViewController: UIViewController {
         sv.setContentOffset(clampedOffset(point, in: sv), animated: animated)
     }
 
-    private func startMomentum() {
-        stopMomentum()
-        let link = CADisplayLink(target: self, selector: #selector(momentumTick(_:)))
-        link.add(to: .main, forMode: .common)
-        momentum = link
+    // MARK: Yumuşak kaydırma
+
+    /// Her kaydırma isteği yalnızca hedefi değiştirir; ekran yenilemesiyle senkron bir döngü sayfayı
+    /// hedefe yavaşlayarak götürür (kenara itme, kaydırma modu, süzülme, yön tuşları, telefon).
+    func smoothScroll(by delta: CGPoint) {
+        guard let sv = engine?.scrollView else { return }
+        let base = smoothTarget ?? sv.contentOffset
+        smoothTarget = clampedOffset(CGPoint(x: base.x + delta.x, y: base.y + delta.y), in: sv)
+        if smoothLink == nil {
+            let link = CADisplayLink(target: self, selector: #selector(smoothTick(_:)))
+            link.add(to: .main, forMode: .common)
+            smoothLink = link
+        }
     }
 
     private func stopMomentum() {
-        momentum?.invalidate()
-        momentum = nil
+        smoothLink?.invalidate()
+        smoothLink = nil
+        smoothTarget = nil
     }
 
-    @objc private func momentumTick(_ link: CADisplayLink) {
-        let dt = link.targetTimestamp - link.timestamp
-        let moved = scrollPage(by: CGPoint(x: velocity.x * dt, y: velocity.y * dt))
-        velocity = CGPoint(x: velocity.x * 0.95, y: velocity.y * 0.95)
-        if !moved || hypot(velocity.x, velocity.y) < 30 { stopMomentum() }
+    @objc private func smoothTick(_ link: CADisplayLink) {
+        guard let sv = engine?.scrollView, let target = smoothTarget else { return stopMomentum() }
+        let current = sv.contentOffset
+        let dx = target.x - current.x, dy = target.y - current.y
+        if abs(dx) < 0.5 && abs(dy) < 0.5 {
+            sv.contentOffset = target
+            if lastTouch == nil || mode == .cursor { stopMomentum() }
+            return
+        }
+        // Kare hızından bağımsız üstel yaklaşma (60 fps'de her karede mesafenin ~%16'sı)
+        let dt = max(link.targetTimestamp - link.timestamp, 1.0 / 120)
+        let k = CGFloat(1 - pow(1 - 0.16, dt * 60))
+        sv.contentOffset = CGPoint(x: current.x + dx * k, y: current.y + dy * k)
     }
 
     // MARK: Kumanda: tuşlar
@@ -574,8 +598,9 @@ final class BrowserViewController: UIViewController {
         case .select:
             selectHoldFired = false
             let work = DispatchWorkItem { [weak self] in
-                self?.selectHoldFired = true
-                self?.showMenu()
+                guard let self else { return }
+                self.selectHoldFired = true
+                self.setMode(self.mode == .cursor ? .scroll : .cursor)
             }
             selectHold = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
@@ -583,8 +608,6 @@ final class BrowserViewController: UIViewController {
             playHoldFired = false
             let work = DispatchWorkItem { [weak self] in
                 self?.playHoldFired = true
-                self?.playSingle?.cancel()
-                self?.playSingle = nil
                 self?.showTabs()
             }
             playHold = work
@@ -607,27 +630,15 @@ final class BrowserViewController: UIViewController {
         case .playPause:
             playHold?.cancel()
             if playHoldFired { return }
-            if let single = playSingle { // çift basış
-                single.cancel()
-                playSingle = nil
-                askAddress()
-            } else {
-                let work = DispatchWorkItem { [weak self] in
-                    guard let self else { return }
-                    self.playSingle = nil
-                    self.setMode(self.mode == .cursor ? .scroll : .cursor)
-                }
-                playSingle = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
-            }
+            showMenu() // Oynat/Duraklat: menü (panel açıkken aynı tuş kapatır)
         case .menu:
             handleBack(presses, event)
-        case .upArrow: scrollPage(by: CGPoint(x: 0, y: -page), animated: true)
-        case .downArrow: scrollPage(by: CGPoint(x: 0, y: page), animated: true)
+        case .upArrow: smoothScroll(by: CGPoint(x: 0, y: -page))
+        case .downArrow: smoothScroll(by: CGPoint(x: 0, y: page))
         case .leftArrow:
-            if findCount > 0 { stepFind(-1) } else { scrollPage(by: CGPoint(x: -page, y: 0), animated: true) }
+            if findCount > 0 { stepFind(-1) } else { smoothScroll(by: CGPoint(x: -page, y: 0)) }
         case .rightArrow:
-            if findCount > 0 { stepFind(1) } else { scrollPage(by: CGPoint(x: page, y: 0), animated: true) }
+            if findCount > 0 { stepFind(1) } else { smoothScroll(by: CGPoint(x: page, y: 0)) }
         default:
             super.pressesEnded(presses, with: event)
         }
@@ -644,7 +655,7 @@ final class BrowserViewController: UIViewController {
         guard let t = activeTab else { return super.pressesEnded(presses, with: event) }
         if findCount > 0 {
             resetFind()
-            showToast("Arama temizlendi")
+            showToast(L("Search cleared"), symbol: "xmark.circle")
         } else if t.isReader {
             toggleReader()
         } else if t.engine.canGoBack {
@@ -661,7 +672,7 @@ final class BrowserViewController: UIViewController {
         stopMomentum()
         UIView.animate(withDuration: 0.2) { self.cursor.alpha = newMode == .cursor ? 1 : 0 }
         updateBadges()
-        showToast(newMode == .cursor ? "İmleç modu" : "Kaydırma modu — tıklayınca imlece dön",
+        showToast(newMode == .cursor ? L("Cursor mode") : L("Scroll mode — click to return to the cursor"),
                   symbol: newMode == .cursor ? "cursorarrow" : "arrow.up.and.down")
         showChrome()
     }
@@ -674,7 +685,7 @@ final class BrowserViewController: UIViewController {
             switch chrome.region(at: view.convert(cursor.center, to: chrome)) {
             case .tabs: showTabSwitcher()
             case .mode: setMode(mode == .cursor ? .scroll : .cursor)
-            case .privateMode: showToast("Gizli gezinme açık — menüden kapatabilirsin", symbol: "eye.slash.fill")
+            case .privateMode: showToast(L("Private browsing is on — you can turn it off from the menu"), symbol: "eye.slash.fill")
             case .address: askAddress()
             }
             return
@@ -704,6 +715,8 @@ final class BrowserViewController: UIViewController {
         guard let info, let kind = info["kind"] as? String else { return }
         fieldFrame = frame
         switch kind {
+        case "input" where activeTab?.isHome == true:
+            askAddress() // ana sayfadaki arama kutusu: modern arama ekranı
         case "input":
             askForText(type: info["type"] as? String ?? "", value: info["value"] as? String ?? "",
                        label: info["label"] as? String ?? "")
@@ -720,7 +733,7 @@ final class BrowserViewController: UIViewController {
     }
 
     private func askForText(type: String, value: String, label: String) {
-        let alert = UIAlertController(title: label.isEmpty ? "Metin gir" : label, message: nil, preferredStyle: .alert)
+        let alert = UIAlertController(title: label.isEmpty ? L("Enter text") : label, message: nil, preferredStyle: .alert)
         alert.addTextField { tf in
             tf.text = value
             tf.isSecureTextEntry = type == "password"
@@ -737,22 +750,22 @@ final class BrowserViewController: UIViewController {
             guard let self else { return }
             self.engine?.evaluate(Pages.setFieldValue(alert?.textFields?.first?.text ?? "", submit: submit), in: self.fieldFrame)
         }
-        alert.addAction(UIAlertAction(title: "Gönder", style: .default) { _ in apply(true) })
-        alert.addAction(UIAlertAction(title: "Yalnızca yaz", style: .default) { _ in apply(false) })
-        alert.addAction(UIAlertAction(title: "Vazgeç", style: .cancel))
+        alert.addAction(UIAlertAction(title: L("Send"), style: .default) { _ in apply(true) })
+        alert.addAction(UIAlertAction(title: L("Type only"), style: .default) { _ in apply(false) })
+        alert.addAction(UIAlertAction(title: L("Cancel"), style: .cancel))
         present(alert, animated: true)
     }
 
     private func chooseOption(options: [String], selected: Int, label: String) {
         guard !options.isEmpty else { return }
-        let panel = MenuPanelController(title: label.isEmpty ? "Seç" : label, subtitle: "\(options.count) seçenek")
+        let panel = MenuPanelController(title: label.isEmpty ? L("Choose") : label, subtitle: L("%d options", options.count))
         for (i, option) in options.enumerated() {
             panel.addItem(option, checked: i == selected) { [weak self] in
                 guard let self else { return }
                 self.engine?.evaluate(Pages.setSelectIndex(i), in: self.fieldFrame)
             }
         }
-        present(panel, animated: false)
+        present(panel, animated: true)
     }
 
     // MARK: Sekme ekranı
@@ -771,7 +784,7 @@ final class BrowserViewController: UIViewController {
     private func tabCards() -> [TabSwitcherController.Card] {
         tabs.enumerated().map { i, t in
             let url = t.url ?? t.pendingURL
-            let host = t.isHome ? "Ana sayfa" : ((url?.host ?? "").replacingOccurrences(of: "www.", with: ""))
+            let host = t.isHome ? L("Home") : ((url?.host ?? "").replacingOccurrences(of: "www.", with: ""))
             return TabSwitcherController.Card(title: t.title, host: host, image: t.snapshot, isCurrent: i == current,
                                               isPrivate: store.privateMode)
         }
@@ -808,15 +821,15 @@ final class BrowserViewController: UIViewController {
         if t.isReader {
             t.isReader = false
             t.engine.reload()
-            showToast("Okuma modu kapandı")
+            showToast(L("Reader mode off"), symbol: "doc.plaintext")
             return
         }
         if t.engine.js(Pages.reader) == "ok" {
             t.isReader = true
             scrollPage(to: .zero, animated: false)
-            showToast("Okuma modu — çıkmak için Menü tuşu")
+            showToast(L("Reader mode — press Menu to exit"), symbol: "doc.plaintext")
         } else {
-            showToast("Bu sayfada okunacak bir makale bulunamadı")
+            showToast(L("No article found on this page"), symbol: "doc.plaintext")
         }
     }
 
@@ -826,7 +839,7 @@ final class BrowserViewController: UIViewController {
         guard let t = activeTab, let host = t.url?.host else { return }
         store.setZoom(zoom, for: host)
         t.engine.js(Pages.applyZoom(zoom))
-        showToast("Yakınlaştırma %\(zoom) — \(host) için hatırlanacak")
+        showToast(L("Zoom %d%% — remembered for %@", zoom, host), symbol: "plus.magnifyingglass")
     }
 
     // MARK: Sayfada bul
@@ -836,7 +849,7 @@ final class BrowserViewController: UIViewController {
         resetFind()
         let count = Int(e.js(Pages.findAll(query)) ?? "") ?? 0
         guard count > 0 else {
-            showToast("“\(query)” bulunamadı")
+            showToast(L("“%@” not found", query), symbol: "magnifyingglass")
             return
         }
         findQuery = query
@@ -858,7 +871,7 @@ final class BrowserViewController: UIViewController {
         let scale = Double(e.view.bounds.width) / iw
         let targetX = x * scale > Double(sv.bounds.width) * 0.8 ? x * scale - Double(sv.bounds.width) * 0.3 : 0
         scrollPage(to: CGPoint(x: targetX, y: y * scale - Double(sv.bounds.height) * 0.35))
-        showToast("\(findIndex + 1) / \(findCount)  ·  ◀ ▶ yön tuşlarıyla gez, Menü ile kapat")
+        showToast(L("%d of %d  ·  ◀ ▶ to move, Menu to close", findIndex + 1, findCount), symbol: "text.magnifyingglass")
     }
 
     func resetFind() {
@@ -905,13 +918,13 @@ final class BrowserViewController: UIViewController {
         var seen = Set<String>()
         for v in allVideos() where v.playable && !seen.contains(v.src) {
             seen.insert(v.src)
-            result.append(("Video · \(URL(string: v.src)?.host ?? "")\(v.paused ? "" : " (oynuyor)")", v.src, v.time, v.referer))
+            result.append((L("Video · %@", URL(string: v.src)?.host ?? "") + (v.paused ? "" : " " + L("(playing)")), v.src, v.time, v.referer))
         }
         if let since = activeTab?.loadStartedAt {
             let sniffed = MediaSniffer.items(since: since)
             for m in sniffed.filter(\.isPlaylist) + sniffed.filter({ !$0.isPlaylist }) where !seen.contains(m.url.absoluteString) {
                 seen.insert(m.url.absoluteString)
-                result.append(("\(m.isPlaylist ? "Akış (HLS)" : "Dosya") · \(m.url.host ?? "")", m.url.absoluteString, 0, m.referer))
+                result.append(((m.isPlaylist ? L("Stream (HLS)") : L("File")) + " · " + (m.url.host ?? ""), m.url.absoluteString, 0, m.referer))
             }
         }
         return result
@@ -937,19 +950,19 @@ final class BrowserViewController: UIViewController {
             }
             if let v = started {
                 self.stopVideoWatch()
-                self.showToast("Video oynatıcıda açılıyor…")
+                self.showToast(L("Opening the video in the player…"), symbol: "play.rectangle.fill")
                 self.playVideo(src: v.src, time: v.time, referer: v.referer)
                 return
             }
             let sniffed = MediaSniffer.items(since: since)
             if let m = sniffed.first(where: \.isPlaylist) ?? (ticks >= 6 ? sniffed.first : nil) {
                 self.stopVideoWatch()
-                self.showToast("Video oynatıcıda açılıyor…")
+                self.showToast(L("Opening the video in the player…"), symbol: "play.rectangle.fill")
                 self.playVideo(src: m.url.absoluteString, time: 0, referer: m.referer)
                 return
             }
             if ticks == 24, videos.contains(where: { $0.blob }) {
-                self.showToast("Video bulundu ama doğrudan oynatılabilir bir adresi yok (korumalı akış)")
+                self.showToast(L("Found a video, but it has no directly playable address (protected stream)"), symbol: "exclamationmark.triangle.fill")
             }
         }
     }
@@ -961,24 +974,11 @@ final class BrowserViewController: UIViewController {
 
     /// Videoyu tvOS'un kendi oynatıcısında tam ekran açar (kumandanın oynat/sar tuşları çalışır).
     /// Film sitelerindeki akışlar çoğu zaman Referer/Origin başlığı ister; videonun bulunduğu sayfanın adresi gönderilir.
-    /// Videoyu açar. Bu sayfada yarım kalmış bir izleme varsa önce "kaldığın yerden devam?" diye sorar.
+    /// Videoyu açar. Yarım kalmış izleme varsa oynatıcı, video süresi belli olunca *aynı video* olduğunu
+    /// doğrulayıp "Kaldığın yerden devam" düğmesi gösterir (aynı sayfadaki başka videolarda sormaz).
     func playVideo(src: String, time: Double, referer: String? = nil) {
         guard presentedViewController == nil else { return }
-        if let page = activeTab?.url?.absoluteString, time < 5, let saved = store.progress(for: page) {
-            let total = saved.duration > 0 ? " / \(Self.clock(saved.duration))" : ""
-            let alert = UIAlertController(title: "Kaldığın yerden devam edilsin mi?",
-                                          message: "\(saved.title)\n\(Self.clock(saved.position))\(total)", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "Devam et (\(Self.clock(saved.position)))", style: .default) { [weak self] _ in
-                self?.presentPlayer(src: src, time: saved.position, referer: referer)
-            })
-            alert.addAction(UIAlertAction(title: "Baştan başla", style: .default) { [weak self] _ in
-                self?.presentPlayer(src: src, time: 0, referer: referer)
-            })
-            alert.addAction(UIAlertAction(title: "Vazgeç", style: .cancel))
-            present(alert, animated: true)
-        } else {
-            presentPlayer(src: src, time: time, referer: referer)
-        }
+        presentPlayer(src: src, time: time, referer: referer)
     }
 
     static func clock(_ seconds: Double) -> String {
@@ -1007,11 +1007,13 @@ final class BrowserViewController: UIViewController {
 
         let page = activeTab?.url?.absoluteString
         let title = activeTab?.title ?? ""
-        let context = PlaybackContext(pageURL: page, title: title, nextEpisode: next?.url, nextEpisodeGuessed: next?.guessed ?? false)
+        let videoKey = Store.videoKey(for: url)
+        let context = PlaybackContext(pageURL: page, title: title, nextEpisode: next?.url, nextEpisodeGuessed: next?.guessed ?? false,
+                                      videoKey: videoKey, resumeCandidates: page.map { store.progressEntries(for: $0) } ?? [])
         let vc = VideoPlayerController()
         let save: (Double, Double) -> Void = { [weak self] position, duration in
             guard let self, let page, !self.store.privateMode else { return }
-            self.store.saveProgress(page: page, title: title, position: position, duration: duration)
+            self.store.saveProgress(page: page, videoKey: videoKey, title: title, position: position, duration: duration)
         }
         vc.onProgress = save
         vc.onClose = { [weak self] position, duration in
@@ -1038,7 +1040,7 @@ final class BrowserViewController: UIViewController {
         guard let t = activeTab else { return }
         t.autoPlayPending = true
         t.engine.load(url)
-        showToast("Sonraki bölüm açılıyor…")
+        showToast(L("Opening the next episode…"), symbol: "forward.end.fill")
     }
 
     /// Sayfadaki en büyük oynatıcıyı bulup ortasına tıklar (sonraki bölüm otomatik başlatma).
@@ -1047,7 +1049,7 @@ final class BrowserViewController: UIViewController {
               let info = parseObject(e.js(Pages.playerRect)),
               let x = info["x"] as? Double, let y = info["y"] as? Double,
               let iw = info["iw"] as? Double, iw > 0 else {
-            showToast("Oynatıcı bulunamadı — videoya kendin tıkla")
+            showToast(L("Player not found — click the video yourself"), symbol: "play.rectangle")
             return
         }
         let px = info["px"] as? Double ?? 0, py = info["py"] as? Double ?? 0
@@ -1056,7 +1058,7 @@ final class BrowserViewController: UIViewController {
         scrollPage(to: CGPoint(x: sv.contentOffset.x, y: docY - Double(sv.bounds.height) / 2), animated: false)
         let screen = CGPoint(x: docX - Double(sv.contentOffset.x), y: docY - Double(sv.contentOffset.y) + Double(Self.barHeight))
         cursor.center = screen
-        showToast("Oynatıcı başlatılıyor…")
+        showToast(L("Starting the player…"), symbol: "play.rectangle.fill")
         clickAtCursor()
     }
 
@@ -1072,8 +1074,8 @@ final class BrowserViewController: UIViewController {
     }
 
     func selectSource(_ index: Int, title: String) {
-        guard engine?.js(Pages.selectSource(index)) == "ok" else { return showToast("Kaynak seçilemedi") }
-        showToast("“\(title)” seçildi — oynatıcıya tıkla")
+        guard engine?.js(Pages.selectSource(index)) == "ok" else { return showToast(L("Couldn't select the source"), symbol: "exclamationmark.triangle.fill") }
+        showToast(L("“%@” selected — click the player", title), symbol: "list.bullet.rectangle")
     }
 
     /// Sayfadaki (tüm iframe'ler dahil) ve bu sayfada ağdan istenen altyazılar.
@@ -1130,11 +1132,11 @@ final class BrowserViewController: UIViewController {
         if store.privateMode {
             store.endPrivate()
             saveSession()
-            showToast("Gizli gezinme kapandı — bu sürede oluşan çerezler silindi")
+            showToast(L("Private browsing off — cookies from this session were deleted"), symbol: "eye")
         } else {
             saveSession()
             store.beginPrivate()
-            showToast("Gizli gezinme açık — geçmiş kaydedilmiyor")
+            showToast(L("Private browsing on — history isn't saved"), symbol: "eye.slash.fill")
         }
         updateBadges()
         updateBar()
@@ -1159,21 +1161,7 @@ final class BrowserViewController: UIViewController {
     }
 
     func showToast(_ text: String, symbol: String? = nil) {
-        toast.show(text, symbol: symbol ?? Self.toastSymbol(for: text), in: view)
-    }
-
-    /// Bildirim metnine uygun SF Symbol.
-    private static func toastSymbol(for text: String) -> String? {
-        let t = text.lowercased(with: Locale(identifier: "tr_TR"))
-        let table: [(String, String)] = [
-            ("sık kullanılan", "star.fill"), ("sekme", "square.on.square"), ("video", "play.rectangle.fill"),
-            ("altyazı", "captions.bubble.fill"), ("gizli", "eye.slash.fill"), ("reklam", "shield.lefthalf.filled"),
-            ("yakınlaştırma", "plus.magnifyingglass"), ("bulunamadı", "magnifyingglass"), ("okuma", "doc.plaintext"),
-            ("telefon", "iphone"), ("bölüm", "forward.end.fill"), ("kaynak", "list.bullet.rectangle"),
-            ("temizlen", "trash"), ("silindi", "trash"), ("açılamıyor", "exclamationmark.triangle.fill"),
-            ("başarısız", "exclamationmark.triangle.fill"), ("kaydedildi", "checkmark.circle.fill"),
-        ]
-        return table.first { t.contains($0.0) }?.1 ?? "info.circle.fill"
+        toast.show(text, symbol: symbol ?? "info.circle.fill", in: view)
     }
 
     private func bounceCursor() {
@@ -1241,15 +1229,15 @@ final class BrowserViewController: UIViewController {
                     try? self.subtitleSources().map { src -> String in
                         switch src {
                         case let .url(u, l, g, r): return "url \(l) [\(g ?? "-")] \(u.absoluteString) ref=\(r ?? "-")"
-                        case let .cues(c, l, g): return "cues \(l) [\(g ?? "-")] \(c.count) satır"
+                        case let .cues(c, l, g): return "cues \(l) [\(g ?? "-")] \(c.count) lines"
                         }
                     }.joined(separator: "\n").write(to: f, atomically: true, encoding: .utf8)
                 case "remote": self.showRemoteInfo()
                 case "next": if let n = self.nextEpisode() { self.openNextEpisode(n.url) }
                 case "sources":
                     let f = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("debug-sources.txt")
-                    let next = self.nextEpisode().map { "\($0.url.absoluteString) tahmini=\($0.guessed)" } ?? "yok"
-                    try? (self.pageSources().map { "\($0.active ? "*" : "-") \($0.text)" } + ["sonraki: \(next)"])
+                    let next = self.nextEpisode().map { "\($0.url.absoluteString) guessed=\($0.guessed)" } ?? "none"
+                    try? (self.pageSources().map { "\($0.active ? "*" : "-") \($0.text)" } + ["next: \(next)"])
                         .joined(separator: "\n").write(to: f, atomically: true, encoding: .utf8)
                 case "jsbench":
                     let r = self.engine?.js(Pages.jsBenchmark) ?? "-"
@@ -1257,8 +1245,8 @@ final class BrowserViewController: UIViewController {
                 case "closefocused":
                     self.showTabSwitcher()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        let r = (self.presentedViewController as? TabSwitcherController)?.debugCloseFocused() ?? "sekme ekranı yok"
-                        Self.debugAppend("perf.txt", "sekme-kapat: \(r)\n")
+                        let r = (self.presentedViewController as? TabSwitcherController)?.debugCloseFocused() ?? "no tab switcher"
+                        Self.debugAppend("perf.txt", "close-tab: \(r)\n")
                     }
                 case "blocked": UserDefaults.standard.set(AdBlocker.blockedCount, forKey: "debugBlockedCount")
                 default: break
