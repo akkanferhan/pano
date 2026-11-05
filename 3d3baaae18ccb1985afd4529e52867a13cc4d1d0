@@ -1,0 +1,36 @@
+Pano.xcodeproj/project.pbxproj
+  s_5baf93b1090e54::t_973c41d9599ba1 11,15,29,34,54,56,156,158
+Pano/MediaSniffer.swift
+  s_5baf93b1090e54::t_d8f66e58304696 12,19,32-45
+Pano/VideoPlayerController.swift
+  s_5baf93b1090e54::t_d6cabfa2d0aa2d 1-22,25-27,29-215
+  s_5baf93b1090e54::t_f518e707bed649 23-24,28
+Pano/Subtitles.swift
+  s_5baf93b1090e54::t_1e1856207daf61 1-126
+Pano/Pages.swift
+  s_5baf93b1090e54::t_d8f66e58304696 218-219,230-231,234-235,350-388
+  s_5baf93b1090e54::t_9a983cf1663666 215-217,220-229,232-233,236-237
+Pano/BrowserViewController.swift
+  s_5baf93b1090e54::t_973c41d9599ba1 878,880-881,885-932,1050-1057
+  s_5baf93b1090e54::t_31109d44aed003 316,635
+Pano/AppDelegate.swift
+  s_5baf93b1090e54::t_79fbbbd22743c2 8-10,36-56
+README.md
+  s_5baf93b1090e54::t_fe886cafa2a529 28-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e74a4c15ae03988b4f0d9f587a767e3bd536c975",
+  "prompts": {},
+  "sessions": {
+    "s_5baf93b1090e54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "601d29e4-ba43-4522-885f-d93753211e45",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Ferhan Akkan"
+    }
+  }
+}
