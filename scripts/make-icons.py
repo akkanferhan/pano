@@ -182,8 +182,8 @@ def shelf(w, h):
     small = font(int(h * 0.062), "Medium")
     x = int(w * left)
     d.text((x, int(h * 0.27)), "Pano", font=big, fill=(255, 255, 255, 255))
-    d.text((x + int(h * 0.008), int(h * 0.56)), "Apple TV için", font=small, fill=(255, 255, 255, 200))
-    d.text((x + int(h * 0.008), int(h * 0.65)), "kişisel tarayıcı", font=small, fill=(255, 255, 255, 200))
+    d.text((x + int(h * 0.008), int(h * 0.56)), "A personal web browser", font=small, fill=(255, 255, 255, 200))
+    d.text((x + int(h * 0.008), int(h * 0.65)), "for Apple TV", font=small, fill=(255, 255, 255, 200))
     return img
 
 def topshelf(name, sizes):

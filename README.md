@@ -1,105 +1,163 @@
-# Pano
+<p align="center">
+  <img src="docs/banner.jpg" alt="Pano — a personal web browser for Apple TV" width="100%">
+</p>
 
-A personal web browser for Apple TV (tvOS), driven by the Siri Remote.
+<p align="center">
+  <b>The web, on the biggest screen in your home.</b><br>
+  A full web browser for Apple TV, built for the Siri Remote — with a real cursor, tabs,
+  a native video player for web videos, subtitles, and your phone as a keyboard.
+</p>
 
-tvOS does not ship WebKit/WKWebView as public API. Pano uses the `UIWebView` class that still exists in UIKit
-at runtime, created through `NSClassFromString` (see `Pano/WebEngine.swift`). Because this is private API, the app
-**cannot be submitted to the App Store**; it is meant for sideloading onto your own device with Xcode.
+<p align="center">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-tvOS%2017%2B-111?logo=apple">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white">
+  <img alt="Languages" src="https://img.shields.io/badge/languages-11-7C3AED">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-EC4899">
+</p>
 
-## Installing on an Apple TV
+---
 
-1. On the Apple TV: Settings → Remotes and Devices → Remote App and Devices, then pair it with Xcode on your Mac
-   (both on the same network; Xcode → Window → Devices and Simulators).
-2. Run `xcodegen generate` (whenever `project.yml` or the file list changes) and open `Pano.xcodeproj`.
-3. Pick the Apple TV as the run destination and press Run (⌘R).
-   Apps signed with a free Apple ID must be reinstalled every 7 days; with a paid developer account, once a year.
+<p align="center">
+  <img src="docs/screenshots/home.jpg" alt="Home screen" width="100%">
+</p>
 
-## Languages
+## Why Pano
 
-The UI is localized into the most widely used languages plus Turkish: English, Simplified Chinese, Hindi, Spanish,
-French, Arabic, Brazilian Portuguese, Russian, German, Japanese and Turkish (`Pano/Localizable.xcstrings`).
-Keys are English; the system language is used by default, and Settings → Language offers an in-app override
-(applied after restarting the app). Use `L("…")` / `L("… %@", value)` from `Pano/Localization.swift` for new strings.
+Apple TV doesn't come with a web browser, and tvOS doesn't offer WebKit to apps. Pano brings the web to the TV
+anyway, and designs every interaction around the remote you already hold: swipe to move a cursor, click to click,
+and let the app handle the rest — typing, scrolling, video, subtitles and tabs.
 
-## Design
+## Highlights
 
-A dark background with violet → pink accents and glass (blur) surfaces. The layered (parallax) tvOS icon and the
-Top Shelf images are generated with `scripts/make-icons.py` (`python3 scripts/make-icons.py . preview.png`, requires Pillow).
-The same visual language is used on the home page (greeting, clock, favicon tiles), the auto-hiding floating top bar,
-the iPadOS-style cursor, the side menu panel, the tab switcher, the search screen, glass toasts and the phone remote page
-(`Pano/Theme.swift`, `Pano/MenuPanel.swift`, `Pano/TabSwitcherController.swift`, `Pano/SearchController.swift`).
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/page.jpg" alt="Browsing with the cursor"></td>
+    <td width="50%"><img src="docs/screenshots/menu.jpg" alt="Side menu"></td>
+  </tr>
+  <tr>
+    <td><b>A cursor that feels native.</b> An iPadOS-style pointer that turns into a ring and slows down over links.
+      Smooth, eased scrolling; push the cursor to an edge to scroll. The top bar gets out of the way as you scroll down.</td>
+    <td><b>Everything one button away.</b> Press Play/Pause for a glass side panel with quick actions, page tools,
+      favorites, history, private browsing and settings.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/tabs.jpg" alt="Tab switcher"></td>
+    <td><img src="docs/screenshots/search.jpg" alt="Search screen"></td>
+  </tr>
+  <tr>
+    <td><b>Tabs with live previews.</b> Up to eight tabs, restored when you come back. Play/Pause closes a tab,
+      holding select shows more options.</td>
+    <td><b>Search the tvOS way.</b> The native search keyboard with dictation and live suggestions from your
+      favorites and history.</td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/player.jpg" alt="Native video player with subtitles"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><b>Web videos in the real Apple TV player.</b> Click a player on a page — even inside an embedded
+      frame from another site — and Pano opens the video in the tvOS player, with the site's subtitles drawn on top.
+      Resume where you left off, jump to the next episode, change speed, skip ±10 s, or search OpenSubtitles.</td>
+  </tr>
+</table>
 
 ## Features
 
-- **Tabs** (up to 8) with a full-screen tab switcher showing page previews; open links in a new tab; `window.open` popups
-  go to a background tab. Play/Pause closes the focused tab, holding select offers more actions.
-- **Session restore**: open tabs come back when the app is relaunched (tabs load on demand).
-- **Search screen**: tvOS's native search layout with live suggestions (go to address, search, favorites, history).
-- **Zoom**: scales the whole page (75–250%), remembered per site; plus a default zoom and text size.
-- **Ad/tracker blocking** (off by default for now, toggle in Settings): ~170 ad/tracking domains are blocked through a
-  `URLProtocol`, and empty ad slots are hidden with CSS.
-- **Smart cursor**: grows and slows down over clickable elements; sends mouse-over events so hover menus work.
-- **Reader mode**: shows the main text of an article on a large-type dark page.
-- **Video site players**: clicks are forwarded into cross-origin player iframes (the WebKit1 `WebFrame` API is not bound
-  by the same-origin policy). For ~12 s after a click, a video that starts playing or a `.m3u8`/`.mp4` requested over
-  the network is captured and opened in the tvOS player with the right Referer/Origin headers. The menu lists all
-  candidates under "Play video full screen". In-page media playback is disabled on purpose (see Stability).
-  Note: this engine has no `MediaSource`; players that only use MSE (blob:) streams or DRM are not supported.
-- **External subtitles**: when the player opens, the site's subtitles (`<track>`, cues loaded by the page's player,
-  `.vtt`/`.srt` files requested over the network, addresses found in player configs) are collected and drawn on top
-  of the video. A track in the app language is selected automatically; Windows-1254 SRTs are decoded correctly.
-  The player's top bar has subtitle selection, timing offset (±0.5 / ±2 s) and appearance (size, white/yellow,
-  box background). Embedded HLS subtitles in the app language are selected automatically.
-- **Resume playback**: the position is saved per page *and* video when the player closes (and every 10 s). When the same
-  video is opened again, a "Resume" button appears inside the player (matched by video address or duration, so other
-  videos on the same page are not affected). The home page has a "Continue watching" row with progress bars.
-- **Next episode**: finds the page's "next episode" link (or guesses it by incrementing the episode number in the
-  address); available in the player menu, as an on-screen button in the last 2 minutes and with a 10 s countdown at the
-  end. On the new page the player is found and clicked automatically.
-- **Source picker**: alternative player buttons ("Source 1 / Alternative / Dubbed / data-frame…") are listed in the menu
-  (only on pages that have a player).
-- **Player**: speed (0.75–2×), skip (10/15/30/60 s steps, "Skip intro +85 s").
-- **OpenSubtitles**: player → Subtitles → Find online. API key in Settings (opensubtitles.com/consumers), optional sign-in.
-  The movie/series name and season/episode are parsed from the page title; searches use the app language.
-- **Phone control**: Menu → Phone control (QR). A small PIN-protected web server runs on the Apple TV on port `8765`;
-  from the phone you can send addresses/searches, type into the selected field, move the cursor and scroll with a touch
-  pad, and use back/home/menu/play-pause.
-- **Find on page**: highlights all matches, step through them with ◀ ▶.
-- **Favorites**: add, delete, rename, edit the address, reorder.
-- **History**: list, search, clear.
-- **Private browsing**: no history/session is saved; on exit (or relaunch) cookies are restored to their earlier state.
-- Desktop/mobile sites (the real user agent is set on the inner `WebView`), search engine, cursor speed.
+**Browsing**
+- Cursor and scroll modes, smart hover, smooth scrolling and edge scrolling
+- Tabs with previews and session restore
+- Favorites (rename, reorder, edit), history with search, private browsing
+- Per-site zoom, text size, reader mode, find on page
+- Desktop or mobile sites, choice of search engine
+- Optional ad and tracker blocking
 
-## Stability and performance
+**Video**
+- Opens web videos (MP4, HLS) in the native tvOS player with the right headers
+- Collects the site's subtitles (`<track>`, WebVTT/SRT, including Windows-1254 SRT files); timing offset and appearance controls
+- Resumes the same video where you left off; a **Continue watching** row on the home screen
+- Next episode detection with an end-of-episode countdown, source/player picker
+- Speed control, ±10 s buttons next to the timeline, skip intro
+- OpenSubtitles search in your language (bring your own free API key)
 
-- **WebThread layout guard** (`Pano/LayoutGuard.swift`): legacy WebKit commits Core Animation transactions on its own
-  thread, which can lay out the whole window. Auto Layout views laid out off the main thread crash on recent tvOS, so
-  non-WebKit views defer such layout passes to the main thread.
-- In-page media playback is disabled (`mediaPlaybackRequiresUserAction`, `play()` only records a request); WebKit's own
-  video UI on tvOS could touch UIKit from the WebThread. `crossorigin` is stripped from media elements because a CORS
-  failure on such a video crashes the legacy engine.
-- JavaScript runs without a JIT on the device (an in-process web view cannot get the JIT entitlement), so script-heavy
-  sites are slower than on a computer; mobile site view helps. The shared `URLCache` is raised to 64 MB / 512 MB.
+**Phone control**
+- Scan a QR code and use your phone as a keyboard, address bar and touch pad
+- Runs on your local network only and is protected by a 6-digit PIN with lockout
+
+**Design and languages**
+- Dark glass design with a layered (parallax) app icon and Top Shelf image
+- Localized into English, 简体中文, हिन्दी, Español, Français, العربية (right-to-left), Português (Brasil),
+  Русский, Deutsch, 日本語 and Türkçe. It follows the system language, and you can override it in Settings.
 
 ## Remote
 
-| Action | Result |
+| Button | Action |
 |---|---|
-| Swipe on the touch surface | Move the cursor (pushing it to the edge scrolls the page) |
-| Click | Click under the cursor; text fields open the keyboard, selects open a picker, videos open full screen |
-| Hold the select button | Menu |
-| Play/Pause | Cursor ↔ scroll mode |
-| Double-press Play/Pause | Address / search screen |
+| Swipe on the touch surface | Move the cursor (push to an edge to scroll) |
+| Click | Click; text fields open the search keyboard, players open the video full screen |
+| **Play/Pause** | Open or close the menu |
 | Hold Play/Pause | Tabs |
-| Arrow buttons | Scroll the page (◀ ▶ move between matches while finding) |
-| Menu / Back | Close find highlights / reader mode → previous page → home page → exit |
+| Hold select | Switch between cursor and scroll mode |
+| Arrow buttons | Scroll the page (◀ ▶ jump between matches when finding) |
+| Menu / Back | Close find or reader mode → back → home → exit |
 
-## Debug launch arguments (DEBUG builds only)
+## Install
 
-- `-openURL <address>`: open this address at launch
-- `-hasSeenHelp YES`: skip the help dialog
-- `-debugClickX <x> -debugClickY <y> [-debugType <text>]`: click that point after 3 s (and type/submit into the field)
-- `-debugAction <action> [-debugDelay <s>]`: `remote`, `next`, `sources`, `subs`, `reader`, `find:word`, `zoom:150`,
-  `menu`, `tabs`, `settings`, `newtab:<address>`, `private`, `hover:x,y`, `play`, `ua`, `videos`, `blocked`,
-  `jsbench`, `closefocused`
-- Debug builds also expose `GET http://<apple-tv>:8765/debug/{jsbench,open?url=,perf}` for on-device measurements.
+Pano uses a private API (see *How it works*), so it is **not on the App Store**. You build it and install it on
+your own Apple TV with Xcode.
+
+**Requirements:** a Mac with Xcode, [XcodeGen](https://github.com/yonaskolb/XcodeGen), an Apple TV on tvOS 17 or
+later, and an Apple ID (a free one works).
+
+1. Clone the repo and set your own team: change `DEVELOPMENT_TEAM` in `project.yml` (and the bundle identifier prefix
+   if you like), then run `xcodegen generate`.
+2. On the Apple TV, open Settings → Remotes and Devices → Remote App and Devices. On the Mac, pair it in
+   Xcode → Window → Devices and Simulators. Both must be on the same network.
+3. Open `Pano.xcodeproj`, choose your Apple TV as the destination and press **Run** (⌘R).
+
+> With a free Apple ID, the app has to be reinstalled every 7 days; with a paid developer account, once a year.
+
+## How it works
+
+- **Engine.** tvOS has no public WebKit, but UIKit still contains `UIWebView` at runtime. Pano creates it with
+  `NSClassFromString` and talks to it via selectors (`Pano/WebEngine.swift`). The real user agent is set on the inner
+  WebKit1 `WebView`.
+- **Frames.** The WebKit1 `WebFrame` API evaluates JavaScript inside cross-origin iframes. Pano uses it to forward
+  clicks into embedded players and to find their videos and subtitles.
+- **Video capture.** In-page playback is disabled. Pano notices that a page asked to play, or captures an `.m3u8` or
+  `.mp4` requested over the network through a `URLProtocol`. It then hands the stream to `AVPlayerViewController`
+  with the page's Referer and Origin headers.
+- **Stability.** The legacy engine renders on its own thread. A layout guard (`Pano/LayoutGuard.swift`) defers
+  off-main-thread layout of regular views, and media elements are sanitized to avoid known engine crashes.
+
+### Limitations
+
+- JavaScript runs without a JIT on the device, so script-heavy sites are slower than on a computer. *Mobile* site
+  view helps.
+- Videos that only play through Media Source Extensions (`blob:`) or DRM can't be opened in the native player.
+- This is a personal, sideloaded app. It relies on private API and may stop working in a future tvOS release.
+
+## Privacy
+
+Pano has no accounts, analytics or servers. Everything stays on the Apple TV: favorites, history, sessions, watch
+progress and settings. The phone remote is a small web page served by the Apple TV itself, on your local network only.
+
+## Development
+
+```
+Pano/
+  BrowserViewController*.swift  browser screen, remote input, menus, phone commands
+  WebEngine.swift               runtime UIWebView bridge, frames, user agent
+  Pages.swift                   home/error pages and injected scripts
+  VideoPlayerController.swift   tvOS player + subtitles, resume, next episode
+  MenuPanel.swift · TabSwitcherController.swift · SearchController.swift · Theme.swift
+  Localizable.xcstrings         11 languages (English keys, use L("…") from Localization.swift)
+scripts/make-icons.py           layered app icon and Top Shelf generator (Pillow)
+```
+
+Debug builds accept launch arguments for testing without a remote: `-openURL <url>`,
+`-debugClickX/-debugClickY [-debugType <text>]` and `-debugAction <action> [-debugDelay <s>]`
+(`menu`, `tabs`, `settings`, `search:<text>`, `opentabs:<url,url>`, `reader`, `find:<word>`, `zoom:<percent>`, `play`, …).
+
+## License
+
+Released under the [MIT License](LICENSE). Pano is not affiliated with Apple. Please respect the terms and the
+content rights of the sites you visit.
