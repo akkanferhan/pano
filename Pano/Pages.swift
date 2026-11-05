@@ -44,6 +44,11 @@ enum Pages {
     a.tile span{font-size:18px;line-height:26px;opacity:.75;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .letter{font-size:56px;font-weight:800;opacity:.9;flex:1}
     .private{display:inline-block;background:#5b2bd6;color:#fff;font-size:22px;padding:6px 16px;border-radius:12px;margin-left:16px;vertical-align:middle}
+    .cwgrid{margin-bottom:50px}
+    a.cw{position:relative;display:flex;flex-direction:column;justify-content:center;width:470px;height:120px;padding:18px 24px;border-radius:18px;background:#1a1f2b;color:#fff;text-decoration:none;overflow:hidden}
+    a.cw b{font-size:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    a.cw span{font-size:18px;color:#8a93a6;margin-top:6px}
+    a.cw i{position:absolute;left:0;bottom:0;height:6px;background:#e50914}
     .err{max-width:1200px}
     .err p{font-size:28px;color:#aab2c4}
     </style>
@@ -55,7 +60,7 @@ enum Pages {
         ("#8e2de2", "#4a00e0"), ("#e65c00", "#f9d423"),
     ]
 
-    static func home(bookmarks: [Bookmark], engine: SearchEngine, isPrivate: Bool) -> String {
+    static func home(bookmarks: [Bookmark], engine: SearchEngine, isPrivate: Bool, continueWatching: [WatchProgress] = []) -> String {
         let tiles = bookmarks.enumerated().map { i, b -> String in
             let p = palettes[i % palettes.count]
             let host = URL(string: b.url)?.host ?? b.url
@@ -64,6 +69,15 @@ enum Pages {
             <a class="tile" style="--a:\(p.0);--b:\(p.1)" href="\(esc(b.url))"><div class="letter">\(esc(letter))</div><b>\(esc(b.title))</b><span>\(esc(host))</span></a>
             """
         }.joined()
+        let watching = continueWatching.prefix(8).map { w -> String in
+            let host = URL(string: w.pageURL)?.host ?? ""
+            let pct = w.duration > 0 ? min(100, Int(w.position / w.duration * 100)) : 0
+            let mins = Int(w.position) / 60, secs = Int(w.position) % 60
+            return """
+            <a class="cw" href="\(esc(w.pageURL))"><b>\(esc(w.title))</b><span>\(esc(host)) · \(mins):\(String(format: "%02d", secs))'den devam</span><i style="width:\(pct)%"></i></a>
+            """
+        }.joined()
+        let watchingSection = watching.isEmpty ? "" : "<h2>İzlemeye devam</h2><div class=\"grid cwgrid\">\(watching)</div>"
         return """
         <!doctype html><html data-pano="home"><head><meta charset="utf-8"><meta name="viewport" content="width=1600">
         <title>Ana Sayfa</title>\(style)</head><body>
@@ -72,6 +86,7 @@ enum Pages {
         <form action="pano://search" method="get">
         <input type="search" name="q" placeholder="\(esc(engine.name)) ile ara veya adres yaz">
         </form>
+        \(watchingSection)
         <h2>Sık Kullanılanlar</h2>
         <div class="grid">\(tiles.isEmpty ? "<div class=\"sub\">Henüz sık kullanılan yok. Bir sitedeyken menüden ekleyebilirsin.</div>" : tiles)</div>
         </body></html>
@@ -389,6 +404,95 @@ enum Pages {
         }
       } catch(e) {}
       return JSON.stringify(out);
+    })()
+    """#
+
+    /// Sayfadaki "sonraki bölüm" bağlantısı (yoksa boş).
+    static let nextEpisode = #"""
+    (function(){
+      var as = document.querySelectorAll('a[href]'), best = '', score = 0;
+      for (var i=0;i<as.length;i++){
+        var a = as[i], href = a.href || '';
+        if (!/^https?:/i.test(href) || href.split('#')[0] === location.href.split('#')[0]) continue;
+        var t = ((a.innerText||'') + ' ' + (a.getAttribute('title')||'') + ' ' + (a.getAttribute('aria-label')||'') + ' ' +
+                 (a.className||'') + ' ' + (a.id||'')).toLowerCase();
+        var rel = (a.getAttribute('rel')||'').toLowerCase();
+        var s = 0;
+        if (/sonraki\s*b[öo]l[üu]m|next\s*episode|sonraki-bolum|next-episode|nextep/.test(t)) s = 10;
+        else if (/(sonraki|next|ileri)/.test(t) && /(b[öo]l[üu]m|bolum|episode|\bep\b)/.test(t + ' ' + href.toLowerCase())) s = 8;
+        else if (rel === 'next' && /(b[öo]l[üu]m|bolum|episode)/.test(href.toLowerCase())) s = 6;
+        if (s > score) { score = s; best = href; }
+      }
+      return best;
+    })()
+    """#
+
+    /// Alternatif oynatıcı / kaynak düğmeleri ("Kaynak 1", "Alternatif", "Türkçe Dublaj", data-frame…).
+    /// Bulunanlar window.__panoSources'a kaydedilir; seçim `selectSource(i)` ile yapılır.
+    static let sources = #"""
+    (function(){
+      var strong = /(kaynak|alternatif|player|oynat[ıi]c[ıi]|sunucu|server|partition|part\s*\d)/i;
+      var weak = /(dublaj|altyaz[ıi]|t[üu]rk[çc]e|orijinal|ingilizce|720|1080|\bhd\b)/i;
+      var avoid = /(film|dizi|kategori|filmler|diziler|t[üu]r[üu]|giri[şs]|kay[ıi]t|ileti[şs]im|yorum|payla[şs])/i;
+      var dataAttrs = ['data-frame','data-src','data-url','data-video','data-embed','data-link','data-iframe','data-player'];
+      var els = document.querySelectorAll('a,button,li,span,div,option');
+      var out = [], seen = {};
+      window.__panoSources = [];
+      for (var i=0;i<els.length && out.length<25;i++){
+        var el = els[i];
+        if (!el.getClientRects().length && el.tagName !== 'OPTION') continue;
+        var text = (el.innerText || el.textContent || '').replace(/\s+/g,' ').trim();
+        var data = '';
+        for (var k=0;k<dataAttrs.length;k++){ var v = el.getAttribute(dataAttrs[k]); if (v) { data = v; break; } }
+        var hasData = !!data && /(\/\/|embed|player|video|\.php|\?)/i.test(data);
+        if (text.length > 40 || (!text && !hasData)) continue;
+        var tag = el.tagName;
+        if ((tag === 'DIV' || tag === 'SPAN' || tag === 'LI') && el.querySelector('a,button,li,div,span') && !hasData) continue;
+        var href = tag === 'A' ? (el.getAttribute('href') || '') : '';
+        var navigates = href && href !== '#' && !/^javascript:/i.test(href);
+        var ok = hasData || strong.test(text) || (!navigates && weak.test(text));
+        if (!ok || (avoid.test(text) && !strong.test(text))) continue;
+        if (navigates && !strong.test(text) && !hasData) continue;
+        var key = text + '|' + data;
+        if (seen[key]) continue;
+        seen[key] = 1;
+        var cls = (el.className && el.className.baseVal === undefined ? el.className : '') + ' ' + (el.parentElement ? el.parentElement.className : '');
+        window.__panoSources.push(el);
+        out.push({ text: text || data, active: /(^|\s)(active|selected|current|aktif)(\s|$)/i.test(String(cls)) });
+      }
+      return JSON.stringify(out);
+    })()
+    """#
+
+    static func selectSource(_ index: Int) -> String {
+        """
+        (function(i){
+          var el = (window.__panoSources || [])[i]; if (!el) return 'yok';
+          if (el.tagName === 'OPTION') { var sel = el.parentElement; sel.value = el.value; sel.dispatchEvent(new Event('change',{bubbles:true})); return 'ok'; }
+          try { el.scrollIntoView({block:'center'}); } catch(e) {}
+          var r = el.getBoundingClientRect(), o = {bubbles:true,cancelable:true,view:window,clientX:r.left+r.width/2,clientY:r.top+r.height/2};
+          ['mouseover','mousedown','mouseup'].forEach(function(n){ el.dispatchEvent(new MouseEvent(n,o)); });
+          if (typeof el.click === 'function') el.click(); else el.dispatchEvent(new MouseEvent('click',o));
+          return 'ok';
+        })(\(index))
+        """
+    }
+
+    /// Sayfadaki en büyük oynatıcı alanı (iframe / video / "player" sınıflı öğe): görünüm koordinatları + kaydırma.
+    static let playerRect = #"""
+    (function(){
+      var best = null, area = 0;
+      var els = document.querySelectorAll('iframe, video, [class*="player"], [id*="player"], [class*="video"], [id*="video"]');
+      for (var i=0;i<els.length;i++){
+        var r = els[i].getBoundingClientRect();
+        if (r.width < 250 || r.height < 140) continue;
+        var a = r.width * r.height;
+        if (els[i].tagName === 'IFRAME' || els[i].tagName === 'VIDEO') a *= 1.5;
+        if (a > area) { area = a; best = r; }
+      }
+      if (!best) return '';
+      return JSON.stringify({x: best.left + best.width/2, y: best.top + best.height/2,
+        px: window.pageXOffset||0, py: window.pageYOffset||0, iw: window.innerWidth});
     })()
     """#
 

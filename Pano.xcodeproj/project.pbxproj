@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		2D5B9D47E614864EA06B5B9F /* Pages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 694F97CD52207D197409DF84 /* Pages.swift */; };
+		34093FAC2233854889002299 /* RemoteServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCE0250DD7F7999CDDC4ADD4 /* RemoteServer.swift */; };
+		4F38DFE260CA6A917AE50F36 /* OpenSubtitles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8EDC015B796449FB35B0A5 /* OpenSubtitles.swift */; };
+		5E0150DAF4FCAB71A7CB4084 /* RemoteInfoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD5C87446151E0A8573B4B1D /* RemoteInfoViewController.swift */; };
+		7594553895D0CB341E124A3F /* BrowserViewController+Remote.swift in Sources */ = {isa = PBXBuildFile; fileRef = F445FB38AA8FF8D6FE24F72D /* BrowserViewController+Remote.swift */; };
 		80C67AD9DD050995062FD748 /* VideoPlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365FE3C96C85007BC20A5EC3 /* VideoPlayerController.swift */; };
 		9307D2A20A245D1DC6C30A5B /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0623588F177B0E7311BB66DE /* Store.swift */; };
 		B6117B92D7F313C88214FB55 /* BrowserViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0472B9780599C9A600AD9006 /* BrowserViewController.swift */; };
@@ -29,13 +33,17 @@
 		365FE3C96C85007BC20A5EC3 /* VideoPlayerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPlayerController.swift; sourceTree = "<group>"; };
 		6540C2E2370AD359ED7BF453 /* AdBlocker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdBlocker.swift; sourceTree = "<group>"; };
 		694F97CD52207D197409DF84 /* Pages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pages.swift; sourceTree = "<group>"; };
+		6C8EDC015B796449FB35B0A5 /* OpenSubtitles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenSubtitles.swift; sourceTree = "<group>"; };
 		75B64AC27B2BC3CE8463EC82 /* BrowserViewController+Menus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrowserViewController+Menus.swift"; sourceTree = "<group>"; };
 		78ADAF404D56F0CF0D4453E8 /* MediaSniffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSniffer.swift; sourceTree = "<group>"; };
 		A8DA55794B86B7F05B6ACEE3 /* Subtitles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subtitles.swift; sourceTree = "<group>"; };
 		AD13DC09C6B6022F075E1F2C /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
 		AF22A45DD1021A67EE7E2992 /* Pano.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Pano.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B94400302E890E027583C578 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		CCE0250DD7F7999CDDC4ADD4 /* RemoteServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServer.swift; sourceTree = "<group>"; };
+		DD5C87446151E0A8573B4B1D /* RemoteInfoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteInfoViewController.swift; sourceTree = "<group>"; };
 		E881610FD10C67278F9247E8 /* WebEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebEngine.swift; sourceTree = "<group>"; };
+		F445FB38AA8FF8D6FE24F72D /* BrowserViewController+Remote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrowserViewController+Remote.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -47,9 +55,13 @@
 				B94400302E890E027583C578 /* Assets.xcassets */,
 				0472B9780599C9A600AD9006 /* BrowserViewController.swift */,
 				75B64AC27B2BC3CE8463EC82 /* BrowserViewController+Menus.swift */,
+				F445FB38AA8FF8D6FE24F72D /* BrowserViewController+Remote.swift */,
 				18FFD055FC17CB4A48EE30E2 /* Info.plist */,
 				78ADAF404D56F0CF0D4453E8 /* MediaSniffer.swift */,
+				6C8EDC015B796449FB35B0A5 /* OpenSubtitles.swift */,
 				694F97CD52207D197409DF84 /* Pages.swift */,
+				DD5C87446151E0A8573B4B1D /* RemoteInfoViewController.swift */,
+				CCE0250DD7F7999CDDC4ADD4 /* RemoteServer.swift */,
 				0623588F177B0E7311BB66DE /* Store.swift */,
 				A8DA55794B86B7F05B6ACEE3 /* Subtitles.swift */,
 				AD13DC09C6B6022F075E1F2C /* Tab.swift */,
@@ -149,9 +161,13 @@
 				EA8815B1C30077F184900B9B /* AdBlocker.swift in Sources */,
 				F0B4ABE62C96658817473B01 /* AppDelegate.swift in Sources */,
 				BF29B473D50DC0A5A1E9CE26 /* BrowserViewController+Menus.swift in Sources */,
+				7594553895D0CB341E124A3F /* BrowserViewController+Remote.swift in Sources */,
 				B6117B92D7F313C88214FB55 /* BrowserViewController.swift in Sources */,
 				C1A9058AC50E83C6E55F8C44 /* MediaSniffer.swift in Sources */,
+				4F38DFE260CA6A917AE50F36 /* OpenSubtitles.swift in Sources */,
 				2D5B9D47E614864EA06B5B9F /* Pages.swift in Sources */,
+				5E0150DAF4FCAB71A7CB4084 /* RemoteInfoViewController.swift in Sources */,
+				34093FAC2233854889002299 /* RemoteServer.swift in Sources */,
 				9307D2A20A245D1DC6C30A5B /* Store.swift in Sources */,
 				BF6D7725BC74D9B995194E7B /* Subtitles.swift in Sources */,
 				CED7972C6316B6E47B428D44 /* Tab.swift in Sources */,

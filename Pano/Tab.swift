@@ -17,6 +17,8 @@ final class Tab {
     var isReader = false
     /// Ana çerçeve gezinmesinin başladığı an (bu sayfada yakalanan video adreslerini ayırmak için).
     var loadStartedAt = Date()
+    /// Sonraki bölüme geçildi: sayfa yüklenince oynatıcı otomatik başlatılsın.
+    var autoPlayPending = false
 
     /// Oturuma kaydedilecek adres; ana sayfa için boş metin.
     var sessionURL: String {

@@ -31,6 +31,16 @@ Bu özel API sayıldığı için **App Store'a gönderilemez**; yalnızca Xcode 
   (±0,5 / ±2 sn) ve yazı boyutu menüleri var. HLS akışına gömülü Türkçe altyazı varsa o seçilir.
   Not: bu motorda `MediaSource` yok; videoyu yalnızca MSE ile oynatan (blob:) ve DRM'li oynatıcılar desteklenmez.
 - **Sayfada bul**: tüm eşleşmeleri vurgular, ◀ ▶ ile gezilir
+- **Kaldığın yerden izle**: oynatıcı kapanınca (ve her 10 sn'de) konum sayfa adresine göre kaydedilir; aynı sayfada video açılınca
+  "Devam et / Baştan başla" sorulur. Ana sayfada "İzlemeye devam" bölümü (ilerleme çubuklu).
+- **Sonraki bölüm**: sayfadaki "sonraki bölüm" bağlantısı (yoksa adresteki bölüm numarası +1, "tahmini") bulunur; oynatıcı menüsünde,
+  son 2 dakikada ekranda düğme, bölüm bitince 10 sn geri sayım. Yeni sayfada oynatıcı bulunup otomatik tıklanır.
+- **Kaynak seçici**: "Kaynak 1 / Alternatif / Türkçe Dublaj / data-frame…" düğmeleri menüde listelenir (kategori bağlantıları hariç).
+- **Oynatıcı**: Hız (0,75–2×), Sar (adım 10/15/30/60 sn, "Jeneriği atla +85 sn"), altyazı görünümü (boyut, beyaz/sarı, kutu arka plan).
+- **OpenSubtitles**: oynatıcı → Altyazı → İnternetten bul. Ayarlar'dan API anahtarı (opensubtitles.com/consumers), isteğe bağlı giriş.
+  Başlıktan film/dizi adı ve sezon/bölüm çıkarılır.
+- **Telefondan kontrol**: Menü → Telefondan kontrol (QR). Apple TV'de `:8765` portunda küçük bir web sunucusu açılır (PIN'li);
+  telefondan adres/arama gönderme, seçili alana metin yazma, dokunmatik alanla imleç ve kaydırma, geri/ana sayfa/menü, oynat/duraklat.
 - **Sık kullanılanlar**: ekle, sil, yeniden adlandır, adresi düzenle, sırala
 - **Geçmiş**: listeleme, arama, temizleme
 - **Gizli gezinme**: geçmiş/oturum kaydedilmez; kapanınca (veya uygulama yeniden açılınca) çerezler girişteki hâline döner
@@ -54,4 +64,4 @@ Bu özel API sayıldığı için **App Store'a gönderilemez**; yalnızca Xcode 
 - `-openURL <adres>`: açılışta bu adresi aç
 - `-hasSeenHelp YES`: yardım penceresini atla
 - `-debugClickX <x> -debugClickY <y> [-debugType <metin>]`: 3 sn sonra o noktaya tıkla (ve metin alanına yazıp gönder)
-- `-debugAction <eylem> [-debugDelay <sn>]`: `reader`, `find:kelime`, `zoom:150`, `menu`, `tabs`, `settings`, `newtab:<adres>`, `private`, `hover:x,y`, `play`, `ua`, `videos`, `blocked`
+- `-debugAction <eylem> [-debugDelay <sn>]`: `remote`, `next`, `sources`, `subs`, `reader`, `find:kelime`, `zoom:150`, `menu`, `tabs`, `settings`, `newtab:<adres>`, `private`, `hover:x,y`, `play`, `ua`, `videos`, `blocked`

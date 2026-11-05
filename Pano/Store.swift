@@ -1,5 +1,13 @@
 import Foundation
 
+struct WatchProgress: Codable, Equatable {
+    var pageURL: String
+    var title: String
+    var position: Double
+    var duration: Double
+    var date: Date
+}
+
 struct Bookmark: Codable, Equatable {
     var title: String
     var url: String
@@ -196,6 +204,91 @@ final class Store {
         URLCache.shared.removeAllCachedResponses()
         d.removeObject(forKey: "privateCookieSnapshot")
         privateMode = false
+    }
+
+    // MARK: İzlemeye devam
+
+    var watchProgress: [WatchProgress] {
+        get { decode("watchProgress") ?? [] }
+        set { encode(Array(newValue.prefix(100)), "watchProgress") }
+    }
+
+    func progress(for page: String) -> WatchProgress? {
+        watchProgress.first { $0.pageURL == page }
+    }
+
+    /// 30 sn'den kısa izlemeler kaydedilmez; bitmek üzere olanlar (son 90 sn) listeden çıkarılır.
+    func saveProgress(page: String, title: String, position: Double, duration: Double) {
+        guard position.isFinite else { return }
+        var list = watchProgress
+        list.removeAll { $0.pageURL == page }
+        let finished = duration.isFinite && duration > 0 && duration - position < 90
+        if position >= 30 && !finished {
+            list.insert(WatchProgress(pageURL: page, title: title, position: position,
+                                      duration: duration.isFinite ? duration : 0, date: Date()), at: 0)
+        }
+        watchProgress = list
+    }
+
+    // MARK: Oynatıcı ayarları
+
+    var playbackRate: Double {
+        get { d.object(forKey: "playbackRate") as? Double ?? 1.0 }
+        set { d.set(newValue, forKey: "playbackRate") }
+    }
+
+    var subtitleFontSize: Double {
+        get { d.object(forKey: "subtitleFontSize") as? Double ?? 46 }
+        set { d.set(newValue, forKey: "subtitleFontSize") }
+    }
+
+    /// "white" | "yellow"
+    var subtitleColor: String {
+        get { d.string(forKey: "subtitleColor") ?? "white" }
+        set { d.set(newValue, forKey: "subtitleColor") }
+    }
+
+    /// 0 = yok (kenarlıklı yazı), 1 = yarı saydam kutu, 2 = siyah kutu
+    var subtitleBackground: Int {
+        get { d.object(forKey: "subtitleBackground") as? Int ?? 0 }
+        set { d.set(newValue, forKey: "subtitleBackground") }
+    }
+
+    var skipStep: Int {
+        get { d.object(forKey: "skipStep") as? Int ?? 10 }
+        set { d.set(newValue, forKey: "skipStep") }
+    }
+
+    // MARK: OpenSubtitles
+
+    var openSubtitlesKey: String? {
+        get { d.string(forKey: "openSubtitlesKey").flatMap { $0.isEmpty ? nil : $0 } }
+        set { d.set(newValue, forKey: "openSubtitlesKey") }
+    }
+
+    var openSubtitlesUser: String? {
+        get { d.string(forKey: "openSubtitlesUser").flatMap { $0.isEmpty ? nil : $0 } }
+        set { d.set(newValue, forKey: "openSubtitlesUser") }
+    }
+
+    var openSubtitlesToken: String? {
+        get { d.string(forKey: "openSubtitlesToken").flatMap { $0.isEmpty ? nil : $0 } }
+        set { d.set(newValue, forKey: "openSubtitlesToken") }
+    }
+
+    // MARK: Telefondan kontrol
+
+    var remoteEnabled: Bool {
+        get { d.bool(forKey: "remoteEnabled") }
+        set { d.set(newValue, forKey: "remoteEnabled") }
+    }
+
+    /// Telefon sayfasının istediği 4 haneli kod (aynı ağdaki başkalarının tarayıcıyı yönetmesini engeller).
+    var remotePIN: String {
+        if let pin = d.string(forKey: "remotePIN"), pin.count == 4 { return pin }
+        let pin = String(format: "%04d", Int.random(in: 0...9999))
+        d.set(pin, forKey: "remotePIN")
+        return pin
     }
 
     // MARK: Yardımcılar

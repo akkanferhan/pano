@@ -80,6 +80,19 @@ extension BrowserViewController {
             }
         }
         if isWeb {
+            let sources = pageSources()
+            if !sources.isEmpty {
+                add(s, "Kaynaklar / oynatıcılar (\(sources.count))…") {
+                    self.pick("Kaynak seç", sources.map { ($0.active ? "● " : "") + $0.text }) { i in
+                        self.selectSource(i, title: sources[i].text)
+                    }
+                }
+            }
+            if let next = nextEpisode() {
+                add(s, next.guessed ? "Sonraki bölüm (tahmini)" : "Sonraki bölüm") { self.openNextEpisode(next.url) }
+            }
+        }
+        if isWeb {
             add(s, t.isReader ? "Okuma modundan çık" : "Okuma modu") { self.toggleReader() }
             add(s, "Sayfada bul…") { self.askFind() }
             if findCount > 0 {
@@ -108,6 +121,7 @@ extension BrowserViewController {
         add(s, "Sık Kullanılanlar") { self.showBookmarks() }
         add(s, "Geçmiş") { self.showHistory() }
         add(s, store.privateMode ? "Gizli gezinmeyi kapat" : "Gizli gezinme") { self.togglePrivate() }
+        add(s, "Telefondan kontrol (QR)") { self.showRemoteInfo() }
         add(s, "Ayarlar") { self.showSettings() }
         add(s, "Kumanda Kullanımı") { self.showHelp() }
         finish(s)
@@ -297,10 +311,61 @@ extension BrowserViewController {
                 self.refreshHomeTabs()
             }
         }
+        add(s, "OpenSubtitles: \(OpenSubtitles.isConfigured ? (store.openSubtitlesUser.map { "anahtar + \($0)" } ?? "anahtar girildi") : "ayarlanmadı")") {
+            self.openSubtitlesSettings()
+        }
+        add(s, "Telefondan kontrol: \(RemoteServer.shared.isRunning ? "Açık" : "Kapalı")") {
+            if RemoteServer.shared.isRunning {
+                RemoteServer.shared.stop()
+                self.store.remoteEnabled = false
+                self.showToast("Telefondan kontrol kapatıldı")
+            } else {
+                self.showRemoteInfo()
+            }
+        }
+        if !store.watchProgress.isEmpty {
+            add(s, "“İzlemeye devam” listesini temizle", style: .destructive) {
+                self.store.watchProgress = []
+                self.refreshHomeTabs()
+                self.showToast("İzleme geçmişi temizlendi")
+            }
+        }
         add(s, "Çerezleri ve önbelleği temizle", style: .destructive) {
             HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
             URLCache.shared.removeAllCachedResponses()
             self.showToast("Çerezler ve önbellek temizlendi")
+        }
+        finish(s)
+    }
+
+    private func openSubtitlesSettings() {
+        let s = sheet("OpenSubtitles", "Altyazı aramak için ücretsiz API anahtarı gerekir: opensubtitles.com/consumers\nKullanıcı girişi isteğe bağlı (indirme kotasını artırır).")
+        add(s, store.openSubtitlesKey == nil ? "API anahtarı gir" : "API anahtarını değiştir") {
+            self.prompt("OpenSubtitles API anahtarı", text: self.store.openSubtitlesKey) { key in
+                self.store.openSubtitlesKey = key
+                self.showToast(key.isEmpty ? "Anahtar silindi" : "Anahtar kaydedildi")
+            }
+        }
+        add(s, store.openSubtitlesUser.map { "Giriş yapıldı: \($0) — yeniden giriş" } ?? "Kullanıcı girişi (isteğe bağlı)") {
+            self.prompt("OpenSubtitles kullanıcı adı", text: self.store.openSubtitlesUser) { user in
+                guard !user.isEmpty else { return }
+                let alert = UIAlertController(title: "Şifre", message: user, preferredStyle: .alert)
+                alert.addTextField { $0.isSecureTextEntry = true }
+                alert.addAction(UIAlertAction(title: "Giriş yap", style: .default) { [weak alert] _ in
+                    OpenSubtitles.login(username: user, password: alert?.textFields?.first?.text ?? "") { error in
+                        self.showToast(error.map { "Giriş başarısız: \($0)" } ?? "OpenSubtitles girişi yapıldı")
+                    }
+                })
+                alert.addAction(UIAlertAction(title: "Vazgeç", style: .cancel))
+                self.present(alert, animated: true)
+            }
+        }
+        if store.openSubtitlesToken != nil {
+            add(s, "Çıkış yap", style: .destructive) {
+                self.store.openSubtitlesToken = nil
+                self.store.openSubtitlesUser = nil
+                self.showToast("OpenSubtitles çıkışı yapıldı")
+            }
         }
         finish(s)
     }
@@ -318,6 +383,8 @@ extension BrowserViewController {
         Oynat/Duraklat'a basılı tut: sekmeler
         Yön tuşları: sayfayı kaydır (sayfada bulda ◀ ▶ eşleşmeler)
         Menü / Geri: önceki sayfa
+        Videoda (aşağı kaydır): Altyazı · Hız · Sar · Sonraki bölüm
+        Telefondan kontrol: Menü → Telefondan kontrol (QR)
         """
         let alert = UIAlertController(title: "Kumanda Kullanımı", message: text, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Tamam", style: .default))
