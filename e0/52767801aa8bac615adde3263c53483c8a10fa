@@ -1,0 +1,40 @@
+Pano/TabSwitcherController.swift
+  s_5baf93b1090e54::t_171df41d0c1136 117,120
+  s_5baf93b1090e54::t_41f1efc2b18bce 1-116,118-119,121-213
+Pano/MenuPanel.swift
+  s_5baf93b1090e54::t_4125c2fdac95b7 355
+  s_5baf93b1090e54::t_4581dc9554c9c2 1-354,356-376
+Pano/AppDelegate.swift
+  s_5baf93b1090e54::t_52518a15d51147 7
+Pano/Theme.swift
+  s_5baf93b1090e54::t_f26c25b7803016 222-232,243
+Pano/Pages.swift
+  s_5baf93b1090e54::t_45e163afedc769 487-488
+Pano.xcodeproj/project.pbxproj
+  s_5baf93b1090e54::t_e512674d2a96e1 14,16,20,35,37,40,68,70,78,178,180,188
+Pano/BrowserViewController.swift
+  s_5baf93b1090e54::t_f26c25b7803016 214,490-491,648-657,724,726,729-770,772
+  s_5baf93b1090e54::t_4125c2fdac95b7 1139
+Pano/BrowserViewController+Menus.swift
+  s_5baf93b1090e54::t_e512674d2a96e1 3,7-8,11-12,14-26,29-30,66,68,70-77,79,83-87,90-96,100,107-113,116-117,119,122,125,128,137-147,172
+Pano/LayoutGuard.swift
+  s_5baf93b1090e54::t_52518a15d51147 1-39
+Pano/Tab.swift
+  s_5baf93b1090e54::t_f26c25b7803016 1,18-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e052767801aa8bac615adde3263c53483c8a10fa",
+  "prompts": {},
+  "sessions": {
+    "s_5baf93b1090e54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "601d29e4-ba43-4522-885f-d93753211e45",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Ferhan Akkan"
+    }
+  }
+}
