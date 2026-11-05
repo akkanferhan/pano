@@ -1,0 +1,65 @@
+.gitignore
+  s_5baf93b1090e54::t_e412accacb4b1a 1-5
+Pano.xcodeproj/project.pbxproj
+  s_5baf93b1090e54::t_bf9189909f4702 1-325
+Pano.xcodeproj/project.xcworkspace/contents.xcworkspacedata
+  s_5baf93b1090e54::t_4ca4bee9de654d 1-7
+Pano/AppDelegate.swift
+  s_5baf93b1090e54::t_0f61a2b8f32d94 1-26
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/App Icon - App Store.imagestack/Back.imagestacklayer/Content.imageset/Contents.json"
+  s_5baf93b1090e54::t_a14699c3c52bf6 1-13
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/App Icon - App Store.imagestack/Back.imagestacklayer/Contents.json"
+  s_5baf93b1090e54::t_0008ec4adf2c97 1-6
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/App Icon - App Store.imagestack/Contents.json"
+  s_5baf93b1090e54::t_ab82f0ae06b991 1-14
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/App Icon - App Store.imagestack/Front.imagestacklayer/Content.imageset/Contents.json"
+  s_5baf93b1090e54::t_6e6b9401b20cf1 1-13
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/App Icon - App Store.imagestack/Front.imagestacklayer/Contents.json"
+  s_5baf93b1090e54::t_6e3493f0a6d3c0 1-6
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/App Icon.imagestack/Back.imagestacklayer/Content.imageset/Contents.json"
+  s_5baf93b1090e54::t_b100fd1ab97970 1-18
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/App Icon.imagestack/Back.imagestacklayer/Contents.json"
+  s_5baf93b1090e54::t_573523e53e3cfb 1-6
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/App Icon.imagestack/Contents.json"
+  s_5baf93b1090e54::t_76e0d2574fbbaa 1-14
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/App Icon.imagestack/Front.imagestacklayer/Content.imageset/Contents.json"
+  s_5baf93b1090e54::t_d56c05d77966d0 1-18
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/App Icon.imagestack/Front.imagestacklayer/Contents.json"
+  s_5baf93b1090e54::t_62f81a1aa8a5a5 1-6
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/Contents.json"
+  s_5baf93b1090e54::t_481608df734977 1-32
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/Top Shelf Image Wide.imageset/Contents.json"
+  s_5baf93b1090e54::t_f7ffa480e82eb3 1-18
+"Pano/Assets.xcassets/App Icon & Top Shelf Image.brandassets/Top Shelf Image.imageset/Contents.json"
+  s_5baf93b1090e54::t_f92b2216e94380 1-18
+Pano/Assets.xcassets/Contents.json
+  s_5baf93b1090e54::t_bc757a01df7ae0 1-6
+Pano/BrowserViewController.swift
+  s_5baf93b1090e54::t_b68f19190a7e77 1-656
+Pano/Info.plist
+  s_5baf93b1090e54::t_b35576d1876044 1-54
+Pano/Pages.swift
+  s_5baf93b1090e54::t_2ba479a9824d5e 1-167
+Pano/WebEngine.swift
+  s_5baf93b1090e54::t_087fcf28b59123 1-98
+README.md
+  s_5baf93b1090e54::t_bbdd76bf94345f 1-34
+project.yml
+  s_5baf93b1090e54::t_5ff90c1b6fbf6e 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "eaad0040dd7d4d5fb98dbd0845398f94a3adfba5",
+  "prompts": {},
+  "sessions": {
+    "s_5baf93b1090e54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "601d29e4-ba43-4522-885f-d93753211e45",
+        "model": "unknown"
+      },
+      "human_author": "Ferhan Akkan"
+    }
+  }
+}
