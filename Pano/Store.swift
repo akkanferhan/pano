@@ -28,7 +28,7 @@ enum SearchEngine: String, CaseIterable {
     }
 }
 
-/// Basit kalıcı depolama: sık kullanılanlar, geçmiş ve ayarlar (UserDefaults).
+/// Kalıcı depolama: sık kullanılanlar, geçmiş, oturum, ayarlar (UserDefaults).
 final class Store {
     static let shared = Store()
     private let d = UserDefaults.standard
@@ -45,20 +45,70 @@ final class Store {
         Bookmark(title: "Hava Durumu", url: "https://www.mgm.gov.tr"),
     ]
 
+    // MARK: Sık kullanılanlar
+
     var bookmarks: [Bookmark] {
         get { decode("bookmarks") ?? defaultBookmarks }
         set { encode(newValue, "bookmarks") }
     }
 
+    func isBookmarked(_ url: String) -> Bool { bookmarks.contains { $0.url == url } }
+
+    func renameBookmark(at i: Int, to title: String) {
+        var b = bookmarks
+        guard b.indices.contains(i), !title.isEmpty else { return }
+        b[i].title = title
+        bookmarks = b
+    }
+
+    func moveBookmark(from i: Int, to j: Int) {
+        var b = bookmarks
+        guard b.indices.contains(i) else { return }
+        let item = b.remove(at: i)
+        b.insert(item, at: min(max(j, 0), b.count))
+        bookmarks = b
+    }
+
+    // MARK: Geçmiş
+
     var history: [Bookmark] {
         get { decode("history") ?? [] }
-        set { encode(Array(newValue.prefix(150)), "history") }
+        set { encode(Array(newValue.prefix(300)), "history") }
     }
+
+    func addHistory(title: String, url: String) {
+        var h = history
+        h.removeAll { $0.url == url }
+        h.insert(Bookmark(title: title.isEmpty ? url : title, url: url), at: 0)
+        history = h
+    }
+
+    func searchHistory(_ query: String) -> [Bookmark] {
+        let q = query.lowercased()
+        return history.filter { $0.title.lowercased().contains(q) || $0.url.lowercased().contains(q) }
+    }
+
+    // MARK: Oturum (açık sekmeler)
+
+    /// Her sekmenin adresi; ana sayfa için boş metin.
+    var sessionTabs: [String] {
+        get { d.stringArray(forKey: "sessionTabs") ?? [] }
+        set { d.set(newValue, forKey: "sessionTabs") }
+    }
+
+    var sessionIndex: Int {
+        get { d.integer(forKey: "sessionIndex") }
+        set { d.set(newValue, forKey: "sessionIndex") }
+    }
+
+    // MARK: Ayarlar
 
     var desktopMode: Bool {
         get { d.object(forKey: "desktopMode") as? Bool ?? true }
         set { d.set(newValue, forKey: "desktopMode") }
     }
+
+    var currentUA: String { desktopMode ? Self.desktopUA : Self.mobileUA }
 
     var cursorSpeed: Double {
         get { d.object(forKey: "cursorSpeed") as? Double ?? 1.0 }
@@ -70,9 +120,35 @@ final class Store {
         set { d.set(newValue, forKey: "textScale") }
     }
 
+    var defaultZoom: Int {
+        get { d.object(forKey: "defaultZoom") as? Int ?? 100 }
+        set { d.set(newValue, forKey: "defaultZoom") }
+    }
+
+    private var zoomByHost: [String: Int] {
+        get { d.dictionary(forKey: "zoomByHost") as? [String: Int] ?? [:] }
+        set { d.set(newValue, forKey: "zoomByHost") }
+    }
+
+    func zoom(for host: String?) -> Int {
+        guard let host else { return defaultZoom }
+        return zoomByHost[host] ?? defaultZoom
+    }
+
+    func setZoom(_ zoom: Int, for host: String) {
+        var z = zoomByHost
+        z[host] = zoom == defaultZoom ? nil : zoom
+        zoomByHost = z
+    }
+
     var searchEngine: SearchEngine {
         get { SearchEngine(rawValue: d.string(forKey: "searchEngine") ?? "") ?? .google }
         set { d.set(newValue.rawValue, forKey: "searchEngine") }
+    }
+
+    var adBlockEnabled: Bool {
+        get { d.object(forKey: "adBlockEnabled") as? Bool ?? true }
+        set { d.set(newValue, forKey: "adBlockEnabled"); AdBlocker.enabled = newValue }
     }
 
     var hasSeenHelp: Bool {
@@ -80,24 +156,42 @@ final class Store {
         set { d.set(newValue, forKey: "hasSeenHelp") }
     }
 
-    var lastURL: String? {
-        get { d.string(forKey: "lastURL") }
-        set { d.set(newValue, forKey: "lastURL") }
+    // MARK: Gizli gezinme
+
+    /// Gizli moddayken geçmiş ve oturum kaydedilmez; çıkarken çerezler girişteki hâline döndürülür.
+    private(set) var privateMode: Bool {
+        get { d.bool(forKey: "privateMode") }
+        set { d.set(newValue, forKey: "privateMode") }
     }
 
-    /// UIWebView kullanıcı ajanını "UserAgent" varsayılanından okur; web görünümü oluşturulmadan önce ayarlanmalı.
-    func applyUserAgent() {
-        d.set(desktopMode ? Self.desktopUA : Self.mobileUA, forKey: "UserAgent")
+    func beginPrivate() {
+        let cookies = (HTTPCookieStorage.shared.cookies ?? []).map { c -> [String: Any] in
+            var dict: [String: Any] = [:]
+            for (k, v) in c.properties ?? [:] { dict[k.rawValue] = v }
+            return dict
+        }
+        let data = try? PropertyListSerialization.data(fromPropertyList: cookies, format: .binary, options: 0)
+        d.set(data, forKey: "privateCookieSnapshot")
+        privateMode = true
     }
 
-    func isBookmarked(_ url: String) -> Bool { bookmarks.contains { $0.url == url } }
-
-    func addHistory(title: String, url: String) {
-        var h = history
-        h.removeAll { $0.url == url }
-        h.insert(Bookmark(title: title.isEmpty ? url : title, url: url), at: 0)
-        history = h
+    func endPrivate() {
+        let storage = HTTPCookieStorage.shared
+        storage.cookies?.forEach { storage.deleteCookie($0) }
+        if let data = d.data(forKey: "privateCookieSnapshot"),
+           let list = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [[String: Any]] {
+            for dict in list {
+                var props: [HTTPCookiePropertyKey: Any] = [:]
+                for (k, v) in dict { props[HTTPCookiePropertyKey(k)] = v }
+                if let cookie = HTTPCookie(properties: props) { storage.setCookie(cookie) }
+            }
+        }
+        URLCache.shared.removeAllCachedResponses()
+        d.removeObject(forKey: "privateCookieSnapshot")
+        privateMode = false
     }
+
+    // MARK: Yardımcılar
 
     /// Adres çubuğuna yazılanı URL'ye çevirir; adres gibi görünmüyorsa arama yapar.
     func resolve(_ input: String) -> URL? {

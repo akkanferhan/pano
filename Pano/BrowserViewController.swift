@@ -1,34 +1,52 @@
+import AVKit
 import UIKit
 
 /// Siri Remote ile kullanılan tarayıcı ekranı.
-/// - İmleç modu: dokunmatik yüzeyde kaydırınca imleç hareket eder, tıklayınca altındaki öğeye tıklanır.
-///   İmleç ekran kenarına itilirse sayfa kayar.
-/// - Kaydırma modu: dokunmatik yüzey sayfayı kaydırır (ataletli).
-/// - Oynat/Duraklat: mod değiştirir. Seçim tuşuna uzun basma: menü. Menü/Geri tuşu: önceki sayfa.
+/// - İmleç modu: dokunmatik yüzeyde kaydırınca imleç hareket eder; tıklanabilir öğe üstünde büyür ve yavaşlar.
+///   Ekran kenarına itilirse sayfa kayar.
+/// - Kaydırma modu: dokunmatik yüzey sayfayı ataletli kaydırır.
+/// - Seçim tuşuna basılı tutma: menü. Oynat/Duraklat: mod değiştir; çift bas: adres; basılı tut: sekmeler.
 final class BrowserViewController: UIViewController {
-    private enum Mode { case cursor, scroll }
+    enum Mode { case cursor, scroll }
 
-    private let store = Store.shared
-    private var engine: WebEngine?
-    private let container = UIView()
-    private let cursor = UIImageView(image: BrowserViewController.cursorImage())
-    private let topBar = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
-    private let titleLabel = UILabel()
-    private let hostLabel = UILabel()
-    private let modeLabel = UILabel()
-    private let spinner = UIActivityIndicatorView(style: .medium)
-    private let toast = PaddedLabel()
+    let store = Store.shared
+    var tabs: [Tab] = []
+    var current = 0
+    var activeTab: Tab? { tabs.indices.contains(current) ? tabs[current] : nil }
+    var engine: WebEngine? { activeTab?.engine }
 
-    private var mode: Mode = .cursor
+    let container = UIView()
+    let cursor = UIImageView(image: BrowserViewController.cursorImage())
+    let topBar = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+    let titleLabel = UILabel()
+    let hostLabel = UILabel()
+    let modeBadge = PaddedLabel.badge()
+    let tabsBadge = PaddedLabel.badge()
+    let privateBadge = PaddedLabel.badge()
+    let spinner = UIActivityIndicatorView(style: .medium)
+    let toast = PaddedLabel()
+
+    var mode: Mode = .cursor
     private var lastTouch: CGPoint?
     private var lastTouchTime: TimeInterval = 0
     private var velocity: CGPoint = .zero
     private var momentum: CADisplayLink?
-    private var longPressWork: DispatchWorkItem?
-    private var longPressFired = false
-    private var showingHome = false
+    private var selectHold: DispatchWorkItem?
+    private var selectHoldFired = false
+    private var playHold: DispatchWorkItem?
+    private var playHoldFired = false
+    private var playSingle: DispatchWorkItem?
+    private var hovering = false
+    private var lastHoverCheck: TimeInterval = 0
 
-    private static let barHeight: CGFloat = 76
+    var findQuery: String?
+    var findCount = 0
+    var findIndex = 0
+
+    static let barHeight: CGFloat = 76
+    static let maxTabs = 8
+
+    // MARK: Yaşam döngüsü
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -43,30 +61,16 @@ final class BrowserViewController: UIViewController {
             showUnavailable()
             return
         }
-        createEngine()
+        if store.privateMode { store.endPrivate() } // gizli oturum uygulama kapanınca biter
+        restoreSession()
 
         cursor.center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
         view.addSubview(cursor)
 
         #if DEBUG
-        if let debugURL = UserDefaults.standard.string(forKey: "openURL") { open(debugURL) } else { goHome() }
-        #else
-        goHome()
+        runDebugLaunchArguments()
         #endif
-        #if DEBUG
-        let d = UserDefaults.standard
-        if d.object(forKey: "debugClickX") != nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-                self?.cursor.center = CGPoint(x: d.double(forKey: "debugClickX"), y: d.double(forKey: "debugClickY"))
-                self?.clickAtCursor()
-                if let text = d.string(forKey: "debugType") {
-                    self?.dismiss(animated: false)
-                    let enc = String(data: try! JSONEncoder().encode(text), encoding: .utf8)!
-                    self?.engine?.js(Pages.setFieldValue(enc, submit: true))
-                }
-            }
-        }
-        #endif
+
         if !store.hasSeenHelp {
             store.hasSeenHelp = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.showHelp() }
@@ -75,16 +79,20 @@ final class BrowserViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        topBar.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: Self.barHeight)
-        engine?.view.frame = CGRect(x: 0, y: Self.barHeight, width: view.bounds.width,
-                                    height: view.bounds.height - Self.barHeight)
+        let w = view.bounds.width
+        topBar.frame = CGRect(x: 0, y: 0, width: w, height: Self.barHeight)
+        activeTab?.engine.view.frame = CGRect(x: 0, y: Self.barHeight, width: w, height: view.bounds.height - Self.barHeight)
+
         let pad: CGFloat = 60
         spinner.center = CGPoint(x: pad + 20, y: Self.barHeight / 2)
-        modeLabel.sizeToFit()
-        modeLabel.frame = CGRect(x: view.bounds.width - pad - modeLabel.bounds.width - 24, y: 18,
-                                 width: modeLabel.bounds.width + 24, height: Self.barHeight - 36)
+        var right = w - pad
+        for badge in [modeBadge, tabsBadge, privateBadge] where !badge.isHidden {
+            let size = badge.sizeThatFits(CGSize(width: 400, height: 50))
+            badge.frame = CGRect(x: right - size.width, y: (Self.barHeight - size.height) / 2, width: size.width, height: size.height)
+            right = badge.frame.minX - 14
+        }
         let textX = pad + 50
-        let textW = modeLabel.frame.minX - textX - 30
+        let textW = right - textX - 16
         titleLabel.frame = CGRect(x: textX, y: 8, width: textW, height: 36)
         hostLabel.frame = CGRect(x: textX, y: 42, width: textW, height: 26)
     }
@@ -93,44 +101,19 @@ final class BrowserViewController: UIViewController {
 
     // MARK: Kurulum
 
-    private func createEngine() {
-        let previousURL = engine?.currentURL
-        engine?.view.removeFromSuperview()
-        store.applyUserAgent()
-        guard let engine = WebEngine() else { showUnavailable(); return }
-        self.engine = engine
-        engine.view.isUserInteractionEnabled = false
-        engine.view.insetsLayoutMarginsFromSafeArea = false
-        engine.scrollView?.contentInsetAdjustmentBehavior = .never
-        engine.scrollView?.contentInset = .zero
-        container.addSubview(engine.view)
-        view.setNeedsLayout()
-
-        engine.onStart = { [weak self] in
-            self?.spinner.startAnimating()
-        }
-        engine.onFinish = { [weak self] in self?.pageFinished() }
-        engine.onFail = { [weak self] error in self?.pageFailed(error) }
-        engine.shouldLoad = { [weak self] request, _ in self?.shouldLoad(request) ?? true }
-
-        if let previousURL { engine.load(previousURL) }
-    }
-
     private func setupTopBar() {
         view.addSubview(topBar)
         titleLabel.font = .systemFont(ofSize: 28, weight: .semibold)
         titleLabel.textColor = .white
         hostLabel.font = .systemFont(ofSize: 20)
         hostLabel.textColor = UIColor(white: 1, alpha: 0.6)
-        modeLabel.font = .systemFont(ofSize: 20, weight: .semibold)
-        modeLabel.textColor = .white
-        modeLabel.textAlignment = .center
-        modeLabel.layer.cornerRadius = 10
-        modeLabel.layer.masksToBounds = true
         spinner.color = .white
         spinner.hidesWhenStopped = true
-        [titleLabel, hostLabel, modeLabel, spinner].forEach { topBar.contentView.addSubview($0) }
-        updateModeLabel()
+        privateBadge.text = "Gizli"
+        privateBadge.backgroundColor = UIColor(red: 0.36, green: 0.17, blue: 0.84, alpha: 0.9)
+        tabsBadge.backgroundColor = UIColor(white: 1, alpha: 0.18)
+        [titleLabel, hostLabel, spinner, modeBadge, tabsBadge, privateBadge].forEach { topBar.contentView.addSubview($0) }
+        updateBadges()
     }
 
     private func setupToast() {
@@ -156,70 +139,269 @@ final class BrowserViewController: UIViewController {
         view.addSubview(label)
     }
 
+    func makeEngine(for tab: Tab) -> WebEngine {
+        let e = WebEngine()!
+        if !e.setUserAgent(store.currentUA) { NSLog("Pano: kullanıcı ajanı ayarlanamadı") }
+        e.view.isUserInteractionEnabled = false
+        e.view.insetsLayoutMarginsFromSafeArea = false
+        e.scrollView?.contentInsetAdjustmentBehavior = .never
+        e.scrollView?.contentInset = .zero
+        e.onStart = { [weak self, weak tab] in
+            guard let self, let tab, tab === self.activeTab else { return }
+            self.spinner.startAnimating()
+        }
+        e.onFinish = { [weak self, weak tab] in
+            guard let self, let tab else { return }
+            self.pageFinished(tab)
+        }
+        e.onFail = { [weak self, weak tab] error in
+            guard let self, let tab else { return }
+            self.pageFailed(tab, error)
+        }
+        e.shouldLoad = { [weak self, weak tab] request, _ in
+            guard let self, let tab else { return true }
+            return self.shouldLoad(request, in: tab)
+        }
+        return e
+    }
+
+    // MARK: Sekmeler
+
+    private func restoreSession() {
+        let saved = store.sessionTabs
+        guard !saved.isEmpty else {
+            addTab(url: nil, activate: true)
+            return
+        }
+        for item in saved.prefix(Self.maxTabs) {
+            let t = Tab()
+            t.engine = makeEngine(for: t)
+            if !item.isEmpty, let url = URL(string: item) {
+                t.pendingURL = url
+                t.isHome = false
+                t.title = url.host ?? item
+            }
+            tabs.append(t)
+        }
+        activate(min(max(store.sessionIndex, 0), tabs.count - 1))
+    }
+
+    @discardableResult
+    func addTab(url: URL?, activate: Bool) -> Bool {
+        guard tabs.count < Self.maxTabs else {
+            showToast("En fazla \(Self.maxTabs) sekme açılabilir")
+            return false
+        }
+        let t = Tab()
+        t.engine = makeEngine(for: t)
+        if let url {
+            t.pendingURL = url
+            t.isHome = false
+            t.title = url.host ?? url.absoluteString
+        }
+        tabs.append(t)
+        if activate { self.activate(tabs.count - 1) } else { updateBadges(); saveSession() }
+        return true
+    }
+
+    func activate(_ index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        resetFind()
+        activeTab?.engine.view.removeFromSuperview()
+        current = index
+        let t = tabs[index]
+        container.addSubview(t.engine.view)
+        t.engine.view.frame = CGRect(x: 0, y: Self.barHeight, width: view.bounds.width,
+                                     height: view.bounds.height - Self.barHeight)
+        if t.needsLoad {
+            t.needsLoad = false
+            if let url = t.pendingURL { t.engine.load(url) } else { loadHome(in: t) }
+        }
+        hovering = false
+        cursor.transform = .identity
+        updateBar()
+        updateBadges()
+        saveSession()
+    }
+
+    func closeTab(_ index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        let t = tabs[index]
+        t.engine.stopLoading()
+        t.engine.view.removeFromSuperview()
+        tabs.remove(at: index)
+        if tabs.isEmpty {
+            current = 0
+            addTab(url: nil, activate: true)
+        } else if index == current {
+            activate(min(index, tabs.count - 1))
+        } else {
+            if index < current { current -= 1 }
+            updateBadges()
+            saveSession()
+        }
+    }
+
+    func saveSession() {
+        guard !store.privateMode else { return }
+        store.sessionTabs = tabs.map(\.sessionURL)
+        store.sessionIndex = current
+    }
+
+    /// Kullanıcı ajanı değişince tüm web motorlarını yeni ajanla yeniden oluşturur ve sayfaları yeniden yükler.
+    func recreateEngines() {
+        for (i, t) in tabs.enumerated() {
+            let url = t.isHome ? nil : (t.url ?? t.pendingURL)
+            t.engine.stopLoading()
+            t.engine.view.removeFromSuperview()
+            t.engine = makeEngine(for: t)
+            t.pendingURL = url
+            t.url = nil
+            t.isHome = url == nil
+            t.needsLoad = i != current
+        }
+        let i = current
+        current = -1
+        tabs[i].needsLoad = true
+        activate(i)
+    }
+
     // MARK: Sayfa olayları
 
-    private func shouldLoad(_ request: URLRequest) -> Bool {
+    private func shouldLoad(_ request: URLRequest, in t: Tab) -> Bool {
         guard let url = request.url else { return true }
         if url.scheme == "pano" {
-            if url.host == "search" {
-                let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                    .queryItems?.first(where: { $0.name == "q" })?.value ?? ""
-                DispatchQueue.main.async { self.open(q) }
-            } else if url.host == "home" {
-                DispatchQueue.main.async { self.goHome() }
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            switch url.host {
+            case "search":
+                let q = items.first { $0.name == "q" }?.value ?? ""
+                DispatchQueue.main.async { self.open(q, in: t) }
+            case "newtab":
+                if let s = items.first(where: { $0.name == "url" })?.value, let target = URL(string: s) {
+                    DispatchQueue.main.async {
+                        if self.addTab(url: target, activate: false) {
+                            self.showToast("Yeni sekmede açıldı — sekmeler için Oynat/Duraklat'a basılı tut")
+                        }
+                    }
+                }
+            default:
+                break
             }
             return false
         }
-        if let scheme = url.scheme, !["http", "https", "about", "data", "blob", "javascript"].contains(scheme) {
+        if let scheme = url.scheme?.lowercased(),
+           !["http", "https", "about", "data", "blob", "javascript", "applewebdata"].contains(scheme) {
             DispatchQueue.main.async { self.showToast("Bu bağlantı türü açılamıyor: \(scheme)") }
             return false
+        }
+        if request.mainDocumentURL == nil || request.mainDocumentURL == url { // ana çerçeve gezinmesi
+            t.mainRequestURL = url.absoluteString
+            t.blockedAtStart = AdBlocker.blockedCount
+            t.isReader = false
+            if t === activeTab { resetFind() }
         }
         return true
     }
 
-    private func pageFinished() {
-        guard let engine else { return }
-        if !engine.isLoading { spinner.stopAnimating() }
-        engine.js(Pages.afterLoad(textScale: store.textScale))
-        let url = engine.currentURL
-        showingHome = engine.js("document.documentElement.getAttribute('data-pano')") == "home"
-        if showingHome {
-            titleLabel.text = "Ana Sayfa"
-            hostLabel.text = "Pano"
-        } else if url == nil {
-            titleLabel.text = engine.title
+    private func pageFinished(_ t: Tab) {
+        let e = t.engine!
+        if t === activeTab { refreshSpinnerSoon() }
+        let marker = e.js("document.documentElement.getAttribute('data-pano')") ?? ""
+        e.js(Pages.afterLoad(textScale: store.textScale, adBlock: store.adBlockEnabled))
+        let url = e.currentURL
+        t.isHome = marker == "home"
+        if t.isHome {
+            t.title = "Ana Sayfa"
+            t.url = nil
+            t.pendingURL = nil
+        } else if marker == "error" {
+            t.title = "Sayfa açılamadı"
         } else if let url {
-            let title = engine.title
-            titleLabel.text = title.isEmpty ? url.host : title
-            hostLabel.text = url.absoluteString
-            store.addHistory(title: title, url: url.absoluteString)
-            store.lastURL = url.absoluteString
+            let title = e.title
+            t.title = title.isEmpty ? (url.host ?? url.absoluteString) : title
+            t.url = url
+            t.pendingURL = nil
+            if !store.privateMode { store.addHistory(title: title, url: url.absoluteString) }
+            let zoom = store.zoom(for: url.host)
+            if zoom != 100 { e.js(Pages.applyZoom(zoom)) }
         }
+        if t === activeTab { updateBar() }
+        saveSession()
     }
 
-    private func pageFailed(_ error: NSError) {
-        spinner.stopAnimating()
-        // -999: iptal edildi, 102: çerçeve yüklemesi kesildi (ör. pano:// yakalandı) — hata değil
-        if error.code == NSURLErrorCancelled || (error.domain == "WebKitErrorDomain" && error.code == 102) { return }
+    private func pageFailed(_ t: Tab, _ error: NSError) {
+        if t === activeTab, !t.engine.isLoading { spinner.stopAnimating() }
+        // -999: iptal; WebKit 102: çerçeve yüklemesi kesildi; 204: eklenti (video) yüklemeyi üstlendi
+        if error.code == NSURLErrorCancelled { return }
+        if error.domain == "WebKitErrorDomain" && (error.code == 102 || error.code == 204) { return }
         let failing = (error.userInfo[NSURLErrorFailingURLStringErrorKey] as? String) ?? ""
-        engine?.loadHTML(Pages.error(url: failing, message: error.localizedDescription), baseURL: nil)
-        titleLabel.text = "Sayfa açılamadı"
-        hostLabel.text = failing
+        guard failing.isEmpty || failing == t.mainRequestURL else { return } // alt kaynak / iframe hatası
+        if error.domain == AdBlocker.errorDomain {
+            if t === activeTab { showToast("Reklam/izleyici adresi engellendi") }
+            return
+        }
+        t.engine.loadHTML(Pages.error(url: failing, message: error.localizedDescription), baseURL: nil)
+        t.title = "Sayfa açılamadı"
+        if t === activeTab {
+            titleLabel.text = t.title
+            hostLabel.text = failing
+        }
     }
 
     // MARK: Gezinme
 
-    private func goHome() {
-        showingHome = true
-        engine?.loadHTML(Pages.home(bookmarks: store.bookmarks, engine: store.searchEngine), baseURL: nil)
-        titleLabel.text = "Ana Sayfa"
-        hostLabel.text = "Pano"
+    func loadHome(in t: Tab) {
+        t.isHome = true
+        t.url = nil
+        t.title = "Ana Sayfa"
+        t.engine.loadHTML(Pages.home(bookmarks: store.bookmarks, engine: store.searchEngine, isPrivate: store.privateMode),
+                          baseURL: nil)
+        if t === activeTab { updateBar() }
     }
 
-    private func open(_ input: String) {
-        guard let url = store.resolve(input) else { return }
-        engine?.load(url)
-        hostLabel.text = url.absoluteString
+    func goHome() {
+        guard let t = activeTab else { return }
+        loadHome(in: t)
+    }
+
+    /// Ana sayfası açık olan sekmeleri yeniler (sık kullanılanlar / arama motoru / gizli mod değişince).
+    func refreshHomeTabs() {
+        for t in tabs where t.isHome && !t.needsLoad { loadHome(in: t) }
+    }
+
+    func open(_ input: String, in t: Tab? = nil) {
+        guard let t = t ?? activeTab, let url = store.resolve(input) else { return }
+        t.engine.load(url)
+        if t === activeTab { hostLabel.text = url.absoluteString }
+    }
+
+    func reloadCurrent() {
+        guard let t = activeTab else { return }
+        if t.isHome { loadHome(in: t) } else { t.isReader = false; t.engine.reload() }
+    }
+
+    // MARK: Üst çubuk
+
+    func updateBar() {
+        guard let t = activeTab else { return }
+        titleLabel.text = t.title
+        if t.isHome {
+            hostLabel.text = store.privateMode ? "Pano · gizli gezinme" : "Pano"
+        } else {
+            hostLabel.text = (t.url ?? t.pendingURL)?.absoluteString ?? ""
+        }
+        if t.engine.isLoading { spinner.startAnimating() } else { spinner.stopAnimating() }
+    }
+
+    func updateBadges() {
+        modeBadge.text = mode == .cursor ? "İmleç" : "Kaydırma"
+        modeBadge.backgroundColor = mode == .cursor
+            ? UIColor(red: 0.31, green: 0.42, blue: 1, alpha: 0.85)
+            : UIColor(red: 0.07, green: 0.6, blue: 0.56, alpha: 0.85)
+        tabsBadge.text = "\(tabs.count) sekme"
+        tabsBadge.isHidden = tabs.count < 2
+        privateBadge.isHidden = !store.privateMode
+        view.setNeedsLayout()
     }
 
     // MARK: Kumanda: dokunmatik yüzey
@@ -242,7 +424,13 @@ final class BrowserViewController: UIViewController {
 
         switch mode {
         case .cursor:
-            moveCursor(by: CGPoint(x: delta.x * store.cursorSpeed, y: delta.y * store.cursorSpeed))
+            // Tıklanabilir bir öğenin üstündeyken imleç yavaşlar; küçük bağlantılara isabet kolaylaşır.
+            let f = store.cursorSpeed * (hovering ? 0.55 : 1)
+            moveCursor(by: CGPoint(x: delta.x * f, y: delta.y * f))
+            if touch.timestamp - lastHoverCheck > 0.06 {
+                lastHoverCheck = touch.timestamp
+                checkHover()
+            }
         case .scroll:
             let f = 1.6 * store.cursorSpeed
             let d = CGPoint(x: delta.x * f, y: delta.y * f)
@@ -254,6 +442,7 @@ final class BrowserViewController: UIViewController {
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         lastTouch = nil
         if mode == .scroll, hypot(velocity.x, velocity.y) > 200 { startMomentum() }
+        if mode == .cursor { checkHover() }
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -261,32 +450,53 @@ final class BrowserViewController: UIViewController {
     }
 
     private func moveCursor(by delta: CGPoint) {
-        let area = webArea()
+        let area = CGRect(x: 0, y: Self.barHeight, width: view.bounds.width, height: view.bounds.height - Self.barHeight)
+            .insetBy(dx: 4, dy: 4)
         let target = CGPoint(x: cursor.center.x + delta.x, y: cursor.center.y + delta.y)
         let clamped = CGPoint(x: min(max(target.x, area.minX), area.maxX),
                               y: min(max(target.y, area.minY), area.maxY))
         cursor.center = clamped
-        // Kenara dayanınca sayfayı kaydır
         let overflow = CGPoint(x: target.x - clamped.x, y: target.y - clamped.y)
         if overflow != .zero { scrollPage(by: CGPoint(x: overflow.x * 2.5, y: overflow.y * 2.5)) }
     }
 
-    private func webArea() -> CGRect {
-        CGRect(x: 0, y: Self.barHeight, width: view.bounds.width, height: view.bounds.height - Self.barHeight)
-            .insetBy(dx: 4, dy: 4)
+    private func checkHover() {
+        guard mode == .cursor, let e = engine, let p = pointer() else { return }
+        let h = e.js(Pages.hover(p)) == "1"
+        guard h != hovering else { return }
+        hovering = h
+        UIView.animate(withDuration: 0.12) {
+            self.cursor.transform = h ? CGAffineTransform(scaleX: 1.4, y: 1.4) : .identity
+        }
     }
 
-    @discardableResult
-    private func scrollPage(by delta: CGPoint, animated: Bool = false) -> Bool {
-        guard let sv = engine?.scrollView else { return false }
+    /// İmlecin web görünümündeki konumu ve kaydırma durumu.
+    func pointer() -> Pointer? {
+        guard let e = engine, let sv = e.scrollView else { return nil }
+        let p = view.convert(cursor.center, to: e.view)
+        return Pointer(viewWidth: Double(e.view.bounds.width), offsetX: Double(sv.contentOffset.x),
+                       offsetY: Double(sv.contentOffset.y), x: Double(p.x), y: Double(p.y))
+    }
+
+    private func clampedOffset(_ p: CGPoint, in sv: UIScrollView) -> CGPoint {
         let inset = sv.adjustedContentInset
         let maxX = max(-inset.left, sv.contentSize.width - sv.bounds.width + inset.right)
         let maxY = max(-inset.top, sv.contentSize.height - sv.bounds.height + inset.bottom)
-        let new = CGPoint(x: min(max(sv.contentOffset.x + delta.x, -inset.left), maxX),
-                          y: min(max(sv.contentOffset.y + delta.y, -inset.top), maxY))
+        return CGPoint(x: min(max(p.x, -inset.left), maxX), y: min(max(p.y, -inset.top), maxY))
+    }
+
+    @discardableResult
+    func scrollPage(by delta: CGPoint, animated: Bool = false) -> Bool {
+        guard let sv = engine?.scrollView else { return false }
+        let new = clampedOffset(CGPoint(x: sv.contentOffset.x + delta.x, y: sv.contentOffset.y + delta.y), in: sv)
         let moved = new != sv.contentOffset
         sv.setContentOffset(new, animated: animated)
         return moved
+    }
+
+    func scrollPage(to point: CGPoint, animated: Bool = true) {
+        guard let sv = engine?.scrollView else { return }
+        sv.setContentOffset(clampedOffset(point, in: sv), animated: animated)
     }
 
     private func startMomentum() {
@@ -314,14 +524,24 @@ final class BrowserViewController: UIViewController {
         guard let press = presses.first else { return super.pressesBegan(presses, with: event) }
         switch press.type {
         case .select:
-            longPressFired = false
+            selectHoldFired = false
             let work = DispatchWorkItem { [weak self] in
-                self?.longPressFired = true
+                self?.selectHoldFired = true
                 self?.showMenu()
             }
-            longPressWork = work
+            selectHold = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
-        case .playPause, .menu, .upArrow, .downArrow, .leftArrow, .rightArrow:
+        case .playPause:
+            playHoldFired = false
+            let work = DispatchWorkItem { [weak self] in
+                self?.playHoldFired = true
+                self?.playSingle?.cancel()
+                self?.playSingle = nil
+                self?.showTabs()
+            }
+            playHold = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
+        case .menu, .upArrow, .downArrow, .leftArrow, .rightArrow:
             break // pressesEnded'de işlenir
         default:
             super.pressesBegan(presses, with: event)
@@ -333,72 +553,84 @@ final class BrowserViewController: UIViewController {
         let page = (engine?.scrollView?.bounds.height ?? 800) * 0.6
         switch press.type {
         case .select:
-            longPressWork?.cancel()
-            if longPressFired { return }
+            selectHold?.cancel()
+            if selectHoldFired { return }
             if mode == .scroll { setMode(.cursor) } else { clickAtCursor() }
         case .playPause:
-            setMode(mode == .cursor ? .scroll : .cursor)
-        case .menu:
-            if let engine, engine.canGoBack {
-                engine.goBack()
-            } else if !showingHome {
-                goHome()
+            playHold?.cancel()
+            if playHoldFired { return }
+            if let single = playSingle { // çift basış
+                single.cancel()
+                playSingle = nil
+                askAddress()
             } else {
-                super.pressesEnded(presses, with: event) // ana ekrana çık
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self else { return }
+                    self.playSingle = nil
+                    self.setMode(self.mode == .cursor ? .scroll : .cursor)
+                }
+                playSingle = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
             }
+        case .menu:
+            handleBack(presses, event)
         case .upArrow: scrollPage(by: CGPoint(x: 0, y: -page), animated: true)
         case .downArrow: scrollPage(by: CGPoint(x: 0, y: page), animated: true)
-        case .leftArrow: scrollPage(by: CGPoint(x: -page, y: 0), animated: true)
-        case .rightArrow: scrollPage(by: CGPoint(x: page, y: 0), animated: true)
+        case .leftArrow:
+            if findCount > 0 { stepFind(-1) } else { scrollPage(by: CGPoint(x: -page, y: 0), animated: true) }
+        case .rightArrow:
+            if findCount > 0 { stepFind(1) } else { scrollPage(by: CGPoint(x: page, y: 0), animated: true) }
         default:
             super.pressesEnded(presses, with: event)
         }
     }
 
     override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        longPressWork?.cancel()
+        selectHold?.cancel()
+        playHold?.cancel()
         super.pressesCancelled(presses, with: event)
     }
 
-    private func setMode(_ newMode: Mode) {
+    /// Menü/Geri: önce bulma vurgusunu, sonra okuma modunu kapatır; sonra geri gider, sonra ana sayfa, en son çıkış.
+    private func handleBack(_ presses: Set<UIPress>, _ event: UIPressesEvent?) {
+        guard let t = activeTab else { return super.pressesEnded(presses, with: event) }
+        if findCount > 0 {
+            resetFind()
+            showToast("Arama temizlendi")
+        } else if t.isReader {
+            toggleReader()
+        } else if t.engine.canGoBack {
+            t.engine.goBack()
+        } else if !t.isHome {
+            loadHome(in: t)
+        } else {
+            super.pressesEnded(presses, with: event) // ana ekrana çık
+        }
+    }
+
+    func setMode(_ newMode: Mode) {
         mode = newMode
         stopMomentum()
         UIView.animate(withDuration: 0.2) { self.cursor.alpha = newMode == .cursor ? 1 : 0 }
-        updateModeLabel()
+        updateBadges()
         showToast(newMode == .cursor ? "İmleç modu" : "Kaydırma modu — tıklayınca imlece dön")
-    }
-
-    private func updateModeLabel() {
-        modeLabel.text = mode == .cursor ? "  İmleç  " : "  Kaydırma  "
-        modeLabel.backgroundColor = mode == .cursor
-            ? UIColor(red: 0.31, green: 0.42, blue: 1, alpha: 0.85)
-            : UIColor(red: 0.07, green: 0.6, blue: 0.56, alpha: 0.85)
-        view.setNeedsLayout()
     }
 
     // MARK: Tıklama ve form alanları
 
     private func clickAtCursor() {
-        guard let engine, let sv = engine.scrollView else { return }
+        guard let e = engine, let p = pointer() else { return }
         bounceCursor()
-        let p = view.convert(cursor.center, to: engine.view)
-        let innerWidth = Double(engine.js("window.innerWidth") ?? "") ?? 0
-        let scale = innerWidth > 0 ? Double(engine.view.bounds.width) / innerWidth : Double(sv.zoomScale)
-        let docX = (Double(sv.contentOffset.x) + Double(p.x)) / scale
-        let docY = (Double(sv.contentOffset.y) + Double(p.y)) / scale
-        guard let json = engine.js(Pages.click(docX: docX, docY: docY)),
-              let data = json.data(using: .utf8),
-              let info = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let kind = info["kind"] as? String else { return }
+        guard let info = parseObject(e.js(Pages.click(p))), let kind = info["kind"] as? String else { return }
         switch kind {
         case "input":
-            askForText(type: info["type"] as? String ?? "",
-                       value: info["value"] as? String ?? "",
+            askForText(type: info["type"] as? String ?? "", value: info["value"] as? String ?? "",
                        label: info["label"] as? String ?? "")
         case "select":
-            chooseOption(options: info["options"] as? [String] ?? [],
-                         selected: info["selected"] as? Int ?? -1,
+            chooseOption(options: info["options"] as? [String] ?? [], selected: info["selected"] as? Int ?? -1,
                          label: info["label"] as? String ?? "")
+        case "video":
+            if let src = info["src"] as? String { playVideo(src: src, time: info["t"] as? Double ?? 0) }
         default:
             break
         }
@@ -419,9 +651,7 @@ final class BrowserViewController: UIViewController {
             }
         }
         let apply: (Bool) -> Void = { [weak self, weak alert] submit in
-            let text = alert?.textFields?.first?.text ?? ""
-            guard let data = try? JSONEncoder().encode(text), let encoded = String(data: data, encoding: .utf8) else { return }
-            self?.engine?.js(Pages.setFieldValue(encoded, submit: submit))
+            self?.engine?.js(Pages.setFieldValue(alert?.textFields?.first?.text ?? "", submit: submit))
         }
         alert.addAction(UIAlertAction(title: "Gönder", style: .default) { _ in apply(true) })
         alert.addAction(UIAlertAction(title: "Yalnızca yaz", style: .default) { _ in apply(false) })
@@ -441,189 +671,159 @@ final class BrowserViewController: UIViewController {
         present(sheet, animated: true)
     }
 
-    // MARK: Menü
-
-    private func showMenu() {
-        guard presentedViewController == nil, let engine else { return }
-        let url = engine.currentURL
-        let isWeb = url.map { $0.scheme == "http" || $0.scheme == "https" } ?? false
-        let sheet = UIAlertController(title: "Pano", message: isWeb ? url?.absoluteString : nil, preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "Adres yaz / Ara", style: .default) { [weak self] _ in self?.askAddress() })
-        sheet.addAction(UIAlertAction(title: "Ana Sayfa", style: .default) { [weak self] _ in self?.goHome() })
-        if engine.canGoBack {
-            sheet.addAction(UIAlertAction(title: "Geri", style: .default) { _ in engine.goBack() })
-        }
-        if engine.canGoForward {
-            sheet.addAction(UIAlertAction(title: "İleri", style: .default) { _ in engine.goForward() })
-        }
-        sheet.addAction(UIAlertAction(title: "Yenile", style: .default) { [weak self] _ in
-            if self?.showingHome == true { self?.goHome() } else { engine.reload() }
-        })
-        if isWeb, let url {
-            let str = url.absoluteString
-            if store.isBookmarked(str) {
-                sheet.addAction(UIAlertAction(title: "Sık kullanılanlardan çıkar", style: .destructive) { [weak self] _ in
-                    self?.store.bookmarks.removeAll { $0.url == str }
-                    self?.showToast("Çıkarıldı")
-                })
-            } else {
-                sheet.addAction(UIAlertAction(title: "Sık kullanılanlara ekle", style: .default) { [weak self] _ in
-                    let title = engine.title
-                    self?.store.bookmarks.append(Bookmark(title: title.isEmpty ? (url.host ?? str) : title, url: str))
-                    self?.showToast("Sık kullanılanlara eklendi")
-                })
-            }
-        }
-        sheet.addAction(UIAlertAction(title: "Sık Kullanılanlar", style: .default) { [weak self] _ in self?.showBookmarks() })
-        sheet.addAction(UIAlertAction(title: "Geçmiş", style: .default) { [weak self] _ in self?.showHistory() })
-        sheet.addAction(UIAlertAction(title: mode == .cursor ? "Kaydırma moduna geç" : "İmleç moduna geç", style: .default) { [weak self] _ in
-            guard let self else { return }
-            self.setMode(self.mode == .cursor ? .scroll : .cursor)
-        })
-        sheet.addAction(UIAlertAction(title: "Ayarlar", style: .default) { [weak self] _ in self?.showSettings() })
-        sheet.addAction(UIAlertAction(title: "Kumanda Kullanımı", style: .default) { [weak self] _ in self?.showHelp() })
-        sheet.addAction(UIAlertAction(title: "Kapat", style: .cancel))
-        present(sheet, animated: true)
+    func linkAtCursor() -> URL? {
+        guard let e = engine, let p = pointer(), let s = e.js(Pages.linkAt(p)), !s.isEmpty else { return nil }
+        return URL(string: s)
     }
 
-    private func askAddress() {
-        let alert = UIAlertController(title: "Adres veya arama", message: "\(store.searchEngine.name) ile aranır", preferredStyle: .alert)
-        alert.addTextField { [weak self] tf in
-            tf.text = self?.showingHome == true ? "" : self?.engine?.currentURL?.absoluteString
-            tf.keyboardType = .URL
-            tf.autocapitalizationType = .none
-            tf.autocorrectionType = .no
+    // MARK: Okuma modu
+
+    func toggleReader() {
+        guard let t = activeTab else { return }
+        if t.isReader {
+            t.isReader = false
+            t.engine.reload()
+            showToast("Okuma modu kapandı")
+            return
         }
-        alert.addAction(UIAlertAction(title: "Git", style: .default) { [weak self, weak alert] _ in
-            self?.open(alert?.textFields?.first?.text ?? "")
-        })
-        alert.addAction(UIAlertAction(title: "Vazgeç", style: .cancel))
-        present(alert, animated: true)
+        if t.engine.js(Pages.reader) == "ok" {
+            t.isReader = true
+            scrollPage(to: .zero, animated: false)
+            showToast("Okuma modu — çıkmak için Menü tuşu")
+        } else {
+            showToast("Bu sayfada okunacak bir makale bulunamadı")
+        }
     }
 
-    private func showBookmarks() {
-        let list = store.bookmarks
-        let sheet = UIAlertController(title: "Sık Kullanılanlar", message: list.isEmpty ? "Henüz yok" : nil, preferredStyle: .actionSheet)
-        for b in list {
-            sheet.addAction(UIAlertAction(title: b.title, style: .default) { [weak self] _ in self?.open(b.url) })
-        }
-        if !list.isEmpty {
-            sheet.addAction(UIAlertAction(title: "Düzenle (sil)…", style: .destructive) { [weak self] _ in self?.editBookmarks() })
-        }
-        sheet.addAction(UIAlertAction(title: "Kapat", style: .cancel))
-        present(sheet, animated: true)
+    // MARK: Yakınlaştırma
+
+    func setZoom(_ zoom: Int) {
+        guard let t = activeTab, let host = t.url?.host else { return }
+        store.setZoom(zoom, for: host)
+        t.engine.js(Pages.applyZoom(zoom))
+        showToast("Yakınlaştırma %\(zoom) — \(host) için hatırlanacak")
     }
 
-    private func editBookmarks() {
-        let sheet = UIAlertController(title: "Silmek için seç", message: nil, preferredStyle: .actionSheet)
-        for b in store.bookmarks {
-            sheet.addAction(UIAlertAction(title: b.title, style: .destructive) { [weak self] _ in
-                self?.store.bookmarks.removeAll { $0 == b }
-                if self?.showingHome == true { self?.goHome() }
-                self?.showToast("\(b.title) silindi")
-            })
+    // MARK: Sayfada bul
+
+    func startFind(_ query: String) {
+        guard let e = engine, !query.isEmpty else { return }
+        resetFind()
+        let count = Int(e.js(Pages.findAll(query)) ?? "") ?? 0
+        guard count > 0 else {
+            showToast("“\(query)” bulunamadı")
+            return
         }
-        sheet.addAction(UIAlertAction(title: "Bitti", style: .cancel))
-        present(sheet, animated: true)
+        findQuery = query
+        findCount = count
+        findIndex = 0
+        focusFind()
     }
 
-    private func showHistory() {
-        let list = store.history.prefix(30)
-        let sheet = UIAlertController(title: "Geçmiş", message: list.isEmpty ? "Henüz yok" : nil, preferredStyle: .actionSheet)
-        for h in list {
-            sheet.addAction(UIAlertAction(title: h.title, style: .default) { [weak self] _ in self?.open(h.url) })
-        }
-        if !list.isEmpty {
-            sheet.addAction(UIAlertAction(title: "Geçmişi temizle", style: .destructive) { [weak self] _ in
-                self?.store.history = []
-                self?.showToast("Geçmiş temizlendi")
-            })
-        }
-        sheet.addAction(UIAlertAction(title: "Kapat", style: .cancel))
-        present(sheet, animated: true)
+    func stepFind(_ step: Int) {
+        guard findCount > 0 else { return }
+        findIndex = (findIndex + step + findCount) % findCount
+        focusFind()
     }
 
-    private func showSettings() {
-        let sheet = UIAlertController(title: "Ayarlar", message: nil, preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "Site görünümü: \(store.desktopMode ? "Masaüstü" : "Mobil") → değiştir", style: .default) { [weak self] _ in
-            guard let self else { return }
-            self.store.desktopMode.toggle()
-            self.createEngine() // kullanıcı ajanı yalnızca yeni web görünümünde geçerli
-            if self.showingHome { self.goHome() }
-            self.showToast(self.store.desktopMode ? "Masaüstü siteler" : "Mobil siteler")
-        })
-        let speeds: [(String, Double)] = [("Yavaş", 0.6), ("Normal", 1.0), ("Hızlı", 1.5), ("Çok hızlı", 2.2)]
-        let currentSpeed = speeds.first { $0.1 == store.cursorSpeed }?.0 ?? "Normal"
-        sheet.addAction(UIAlertAction(title: "İmleç hızı: \(currentSpeed)", style: .default) { [weak self] _ in
-            self?.pick("İmleç hızı", speeds.map { $0.0 }) { i in self?.store.cursorSpeed = speeds[i].1 }
-        })
-        let scales = [100, 125, 150, 175, 200]
-        sheet.addAction(UIAlertAction(title: "Yazı boyutu: %\(store.textScale)", style: .default) { [weak self] _ in
-            self?.pick("Yazı boyutu", scales.map { "%\($0)" }) { i in
-                self?.store.textScale = scales[i]
-                self?.engine?.js("document.documentElement.style.webkitTextSizeAdjust='\(scales[i])%'")
-            }
-        })
-        sheet.addAction(UIAlertAction(title: "Arama motoru: \(store.searchEngine.name)", style: .default) { [weak self] _ in
-            let engines = SearchEngine.allCases
-            self?.pick("Arama motoru", engines.map { $0.name }) { i in
-                self?.store.searchEngine = engines[i]
-                if self?.showingHome == true { self?.goHome() }
-            }
-        })
-        sheet.addAction(UIAlertAction(title: "Çerezleri ve önbelleği temizle", style: .destructive) { [weak self] _ in
-            HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
-            URLCache.shared.removeAllCachedResponses()
-            self?.showToast("Çerezler ve önbellek temizlendi")
-        })
-        sheet.addAction(UIAlertAction(title: "Kapat", style: .cancel))
-        present(sheet, animated: true)
+    private func focusFind() {
+        guard let e = engine, let sv = e.scrollView, let info = parseObject(e.js(Pages.findFocus(findIndex))),
+              let y = info["y"] as? Double, let iw = info["iw"] as? Double, iw > 0 else { return }
+        let x = info["x"] as? Double ?? 0
+        let scale = Double(e.view.bounds.width) / iw
+        let targetX = x * scale > Double(sv.bounds.width) * 0.8 ? x * scale - Double(sv.bounds.width) * 0.3 : 0
+        scrollPage(to: CGPoint(x: targetX, y: y * scale - Double(sv.bounds.height) * 0.35))
+        showToast("\(findIndex + 1) / \(findCount)  ·  ◀ ▶ yön tuşlarıyla gez, Menü ile kapat")
     }
 
-    private func pick(_ title: String, _ options: [String], _ done: @escaping (Int) -> Void) {
-        let sheet = UIAlertController(title: title, message: nil, preferredStyle: .actionSheet)
-        for (i, o) in options.enumerated() {
-            sheet.addAction(UIAlertAction(title: o, style: .default) { _ in done(i) })
+    func resetFind() {
+        if findQuery != nil { engine?.js(Pages.findClear) }
+        findQuery = nil
+        findCount = 0
+        findIndex = 0
+    }
+
+    // MARK: Video
+
+    func pageVideos() -> [(src: String, time: Double)] {
+        guard let json = engine?.js(Pages.videos), let data = json.data(using: .utf8),
+              let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        return list.compactMap { item in
+            guard let src = item["src"] as? String else { return nil }
+            return (src, item["t"] as? Double ?? 0)
         }
-        sheet.addAction(UIAlertAction(title: "Vazgeç", style: .cancel))
-        present(sheet, animated: true)
     }
 
-    private func showHelp() {
-        let text = """
-        Dokunmatik yüzeyde kaydır: imleci hareket ettir
-        İmleci kenara it: sayfa kayar
-        Tıkla: bağlantıya / düğmeye tıkla, metin alanında klavye açılır
-        Tıklayıp basılı tut: menü (adres, sık kullanılanlar, ayarlar)
-        Oynat/Duraklat: imleç ↔ kaydırma modu
-        Yön tuşları: sayfayı aşağı/yukarı kaydır
-        Menü / Geri: önceki sayfa
-        """
-        let alert = UIAlertController(title: "Kumanda Kullanımı", message: text, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Tamam", style: .default))
-        present(alert, animated: true)
+    /// Sayfadaki videoyu tvOS'un kendi oynatıcısında tam ekran açar (kumandanın oynat/sar tuşları çalışır).
+    func playVideo(src: String, time: Double) {
+        guard let url = URL(string: src) else { return }
+        var headers = ["User-Agent": store.currentUA]
+        if let page = activeTab?.url { headers["Referer"] = page.absoluteString }
+        let options: [String: Any] = [
+            AVURLAssetHTTPCookiesKey: HTTPCookieStorage.shared.cookies(for: url) ?? [],
+            "AVURLAssetHTTPHeaderFieldsKey": headers,
+        ]
+        let player = AVPlayer(playerItem: AVPlayerItem(asset: AVURLAsset(url: url, options: options)))
+        if time > 1 { player.seek(to: CMTime(seconds: time, preferredTimescale: 600)) }
+        engine?.js(Pages.pauseVideos)
+        let vc = AVPlayerViewController()
+        vc.player = player
+        present(vc, animated: true) { player.play() }
+    }
+
+    // MARK: Gizli gezinme
+
+    func togglePrivate() {
+        if store.privateMode {
+            store.endPrivate()
+            saveSession()
+            showToast("Gizli gezinme kapandı — bu sürede oluşan çerezler silindi")
+        } else {
+            saveSession()
+            store.beginPrivate()
+            showToast("Gizli gezinme açık — geçmiş kaydedilmiyor")
+        }
+        updateBadges()
+        updateBar()
+        refreshHomeTabs()
     }
 
     // MARK: Görsel yardımcılar
 
-    private func showToast(_ text: String) {
+    /// UIWebView bazen son "bitti" bildiriminde hâlâ yükleniyor der; kısa aralıklarla tekrar bakar.
+    private func refreshSpinnerSoon() {
+        for delay in [0.0, 1.0, 3.0, 6.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, let e = self.engine else { return }
+                if e.isLoading { self.spinner.startAnimating() } else { self.spinner.stopAnimating() }
+            }
+        }
+    }
+
+    func showToast(_ text: String) {
         toast.text = text
-        let size = toast.sizeThatFits(CGSize(width: 900, height: 400))
+        let size = toast.sizeThatFits(CGSize(width: 1100, height: 400))
         toast.frame = CGRect(x: (view.bounds.width - size.width) / 2, y: view.bounds.height - size.height - 70,
                              width: size.width, height: size.height)
         view.bringSubviewToFront(toast)
         toast.layer.removeAllAnimations()
         UIView.animate(withDuration: 0.2, animations: { self.toast.alpha = 1 }) { _ in
-            UIView.animate(withDuration: 0.4, delay: 1.8, options: [], animations: { self.toast.alpha = 0 })
+            UIView.animate(withDuration: 0.4, delay: 2.2, options: [], animations: { self.toast.alpha = 0 })
         }
     }
 
     private func bounceCursor() {
+        let rest: CGAffineTransform = hovering ? CGAffineTransform(scaleX: 1.4, y: 1.4) : .identity
         UIView.animate(withDuration: 0.08, animations: {
-            self.cursor.transform = CGAffineTransform(scaleX: 0.75, y: 0.75)
+            self.cursor.transform = rest.scaledBy(x: 0.7, y: 0.7)
         }) { _ in
-            UIView.animate(withDuration: 0.12) { self.cursor.transform = .identity }
+            UIView.animate(withDuration: 0.12) { self.cursor.transform = rest }
         }
+    }
+
+    func parseObject(_ json: String?) -> [String: Any]? {
+        guard let data = json?.data(using: .utf8) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
     private static func cursorImage() -> UIImage {
@@ -642,10 +842,72 @@ final class BrowserViewController: UIViewController {
             c.fillEllipse(in: CGRect(x: 18, y: 18, width: 8, height: 8))
         }
     }
+
+    // MARK: Debug
+
+    #if DEBUG
+    /// Simülatörde kumanda olmadan test için: -openURL, -debugClickX/-debugClickY [-debugType], -debugAction.
+    private func runDebugLaunchArguments() {
+        let d = UserDefaults.standard
+        if let s = d.string(forKey: "openURL") { open(s) }
+        if d.object(forKey: "debugClickX") != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                self?.cursor.center = CGPoint(x: d.double(forKey: "debugClickX"), y: d.double(forKey: "debugClickY"))
+                self?.clickAtCursor()
+                if let text = d.string(forKey: "debugType") {
+                    self?.dismiss(animated: false)
+                    self?.engine?.js(Pages.setFieldValue(text, submit: true))
+                }
+            }
+        }
+        // ör. -debugAction "reader" | "find:kelime" | "zoom:150" | "menu" | "tabs" | "newtab:https://..." | "hover:x,y"
+        if let action = d.string(forKey: "debugAction") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (d.object(forKey: "debugDelay") as? Double ?? 5)) { [weak self] in
+                guard let self else { return }
+                let parts = action.split(separator: ":", maxSplits: 1).map(String.init)
+                let arg = parts.count > 1 ? parts[1] : ""
+                switch parts[0] {
+                case "reader": self.toggleReader()
+                case "find": self.startFind(arg)
+                case "zoom": self.setZoom(Int(arg) ?? 150)
+                case "menu": self.showMenu()
+                case "tabs": self.showTabs()
+                case "settings": self.showSettings()
+                case "newtab": self.addTab(url: URL(string: arg), activate: false)
+                case "private": self.togglePrivate()
+                case "hover":
+                    let xy = arg.split(separator: ",").compactMap { Double($0) }
+                    if xy.count == 2 { self.cursor.center = CGPoint(x: xy[0], y: xy[1]); self.checkHover() }
+                case "videos": UserDefaults.standard.set(self.pageVideos().map(\.src), forKey: "debugVideos")
+                case "play": if let v = self.pageVideos().first { self.playVideo(src: v.src, time: v.time) }
+                case "ua":
+                    self.store.desktopMode.toggle(); self.recreateEngines()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        let f = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("debug-ua.txt")
+                        try? "\(self.store.desktopMode) \(self.engine?.js("navigator.userAgent") ?? "")".write(to: f, atomically: true, encoding: .utf8)
+                    }
+                case "blocked": UserDefaults.standard.set(AdBlocker.blockedCount, forKey: "debugBlockedCount")
+                default: break
+                }
+            }
+        }
+    }
+    #endif
 }
 
 final class PaddedLabel: UILabel {
     var insets = UIEdgeInsets(top: 18, left: 30, bottom: 18, right: 30)
+
+    static func badge() -> PaddedLabel {
+        let l = PaddedLabel()
+        l.insets = UIEdgeInsets(top: 6, left: 16, bottom: 6, right: 16)
+        l.font = .systemFont(ofSize: 20, weight: .semibold)
+        l.textColor = .white
+        l.textAlignment = .center
+        l.layer.cornerRadius = 10
+        l.layer.masksToBounds = true
+        return l
+    }
 
     override func drawText(in rect: CGRect) { super.drawText(in: rect.inset(by: insets)) }
 

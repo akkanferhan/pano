@@ -31,6 +31,20 @@ final class WebEngine {
         view.isOpaque = false
     }
 
+    /// Kullanıcı ajanını ayarlar. UIWebView'in içindeki belge görünümünden (UIWebBrowserView) WebKit1 `WebView`
+    /// nesnesine ulaşıp `setCustomUserAgent:` çağırır. Başarılıysa true döner.
+    @discardableResult
+    func setUserAgent(_ ua: String) -> Bool {
+        guard let sv = scrollView else { return false }
+        for sub in sv.subviews where sub.responds(to: sel("webView")) {
+            guard let wv = sub.perform(sel("webView"))?.takeUnretainedValue() as? NSObject,
+                  wv.responds(to: sel("setCustomUserAgent:")) else { continue }
+            _ = wv.perform(sel("setCustomUserAgent:"), with: ua as NSString)
+            return true
+        }
+        return false
+    }
+
     deinit {
         view.setValue(nil, forKey: "delegate")
     }
