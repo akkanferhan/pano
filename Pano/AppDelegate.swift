@@ -5,6 +5,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         LayoutGuard.install()
+        // Web motoru paylaşılan URLCache'i kullanır; varsayılanı (512 KB / 10 MB) çok küçük — siteler her seferinde baştan iner.
+        URLCache.shared = URLCache(memoryCapacity: 64 * 1024 * 1024, diskCapacity: 512 * 1024 * 1024, diskPath: "PanoWebCache")
         AdBlocker.install()
         #if DEBUG
         installCrashLogger()

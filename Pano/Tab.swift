@@ -17,6 +17,16 @@ final class Tab {
     var isReader = false
     /// Sekme ekranı için son anlık görüntü.
     var snapshot: UIImage?
+    /// Bu gezinmede ilk ara "bitti" bildirimi işlendi mi (sonrakiler son bildirime kadar atlanır).
+    var handledInterimFinish = false
+    /// Yükleme bittiğindeki son işler (geçmiş, oturum, medya güvenliği) yapıldı mı.
+    var finalHandled = false
+    #if DEBUG
+    var perfStart = Date()
+    var perfFinishes = 0
+    var perfOurTime: Double = 0
+    var perfLogged = false
+    #endif
     /// Ana çerçeve gezinmesinin başladığı an (bu sayfada yakalanan video adreslerini ayırmak için).
     var loadStartedAt = Date()
     /// Sonraki bölüme geçildi: sayfa yüklenince oynatıcı otomatik başlatılsın.

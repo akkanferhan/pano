@@ -23,6 +23,10 @@ final class RemoteServer {
     /// Komutları işler (ana iş parçacığında çağrılır). `state` için geçerli sayfa bilgisini döndürür.
     var handler: ((Command) -> Void)?
     var stateProvider: (() -> [String: Any])?
+    #if DEBUG
+    /// Yalnızca debug: GET /debug/<komut>?… (PIN'siz) — cihazda performans ölçümü için.
+    var debugHandler: ((String, [String: String]) -> String)?
+    #endif
 
     private var listener: NWListener?
     private(set) var isRunning = false
@@ -82,6 +86,12 @@ final class RemoteServer {
     }
 
     private func respond(to r: HTTPRequest) -> Data {
+        #if DEBUG
+        if r.method == "GET", r.path.hasPrefix("/debug/") {
+            let out = debugHandler?(String(r.path.dropFirst(7)), r.query) ?? "yok"
+            return Self.http(200, "text/plain; charset=utf-8", out)
+        }
+        #endif
         guard r.query["k"] == pin else {
             return Self.http(403, "text/html; charset=utf-8",
                              "<meta name=viewport content='width=device-width'><h2 style='font-family:sans-serif'>Pano: PIN hatalı. Apple TV'deki QR kodu yeniden okut.</h2>")

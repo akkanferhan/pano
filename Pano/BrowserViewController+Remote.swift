@@ -10,6 +10,24 @@ extension BrowserViewController {
             return ["title": t.title, "url": t.isHome ? "" : (t.url?.absoluteString ?? "")]
         }
         if store.remoteEnabled { try? server.start() }
+        #if DEBUG
+        try? server.start()
+        server.debugHandler = { [weak self] command, query in
+            guard let self, let e = self.engine else { return "motor yok" }
+            switch command {
+            case "jsbench":
+                return e.js(Pages.jsBenchmark) ?? "-"
+            case "open":
+                if let u = query["url"] { self.open(u) }
+                return "açılıyor: \(query["url"] ?? "")"
+            case "perf":
+                let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("perf.txt")
+                return (try? String(contentsOf: url, encoding: .utf8)) ?? "(boş)"
+            default:
+                return "komutlar: jsbench, open?url=, perf"
+            }
+        }
+        #endif
     }
 
     func showRemoteInfo() {

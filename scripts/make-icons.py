@@ -170,15 +170,20 @@ def stack(name, sizes):
         imageset(os.path.join(lp, "Content.imageset"), files)
 
 def shelf(w, h):
+    """Top Shelf: tvOS tam ekran gösterirken yanları kırpar (yalnızca ortadaki 16:9 bölge görünür:
+    1920x720'de orta ~%67, 2320x720'de orta ~%55). Bu yüzden yazı ve görsel ortada toplanır."""
     img = back(w, h)
-    img.alpha_composite(middle(w, h, cx=0.70, cy=0.52, scale=1.0))
-    img.alpha_composite(pointer(w, h, px=0.83, py=0.72, scale=1.0))
+    safe = (h * 16 / 9) / w            # görünen genişlik oranı
+    left = 0.5 - safe / 2 + 0.04       # güvenli bölgenin sol kenarı (+pay)
+    img.alpha_composite(middle(w, h, cx=0.5 + safe * 0.20, cy=0.52, scale=0.78))
+    img.alpha_composite(pointer(w, h, px=0.5 + safe * 0.33, py=0.70, scale=0.8))
     d = ImageDraw.Draw(img)
-    big = font(int(h * 0.26), "Bold")
-    small = font(int(h * 0.075), "Medium")
-    x = int(w * 0.08)
-    d.text((x, int(h * 0.30)), "Pano", font=big, fill=(255, 255, 255, 255))
-    d.text((x + int(h * 0.01), int(h * 0.62)), "Apple TV için kişisel tarayıcı", font=small, fill=(255, 255, 255, 190))
+    big = font(int(h * 0.22), "Bold")
+    small = font(int(h * 0.062), "Medium")
+    x = int(w * left)
+    d.text((x, int(h * 0.27)), "Pano", font=big, fill=(255, 255, 255, 255))
+    d.text((x + int(h * 0.008), int(h * 0.56)), "Apple TV için", font=small, fill=(255, 255, 255, 200))
+    d.text((x + int(h * 0.008), int(h * 0.65)), "kişisel tarayıcı", font=small, fill=(255, 255, 255, 200))
     return img
 
 def topshelf(name, sizes):

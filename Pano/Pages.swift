@@ -551,6 +551,13 @@ enum Pages {
     })()
     """#
 
+    #if DEBUG
+    static let jsBenchmark = """
+    (function(){ var t0 = Date.now(), x = 0; for (var i = 0; i < 30000000; i++) { x = (x + i * 7) % 1000003; }
+      var t1 = Date.now(); return 'dongu=' + (t1 - t0) + 'ms wasm=' + (typeof WebAssembly) + ' x=' + x; })()
+    """
+    #endif
+
     static let pauseVideos = "(function(){var v=document.querySelectorAll('video');for(var i=0;i<v.length;i++){try{v[i].pause()}catch(e){}}})()"
 
     // MARK: Okuma modu
