@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 
 /// Bir tarayıcı sekmesi: kendi web motoru ve durumu.
 final class Tab {
@@ -15,6 +15,8 @@ final class Tab {
     /// Sayfa yüklenmeye başladığındaki toplam engelleme sayısı (sayfa başına sayaç için).
     var blockedAtStart = 0
     var isReader = false
+    /// Sekme ekranı için son anlık görüntü.
+    var snapshot: UIImage?
     /// Ana çerçeve gezinmesinin başladığı an (bu sayfada yakalanan video adreslerini ayırmak için).
     var loadStartedAt = Date()
     /// Sonraki bölüme geçildi: sayfa yüklenince oynatıcı otomatik başlatılsın.

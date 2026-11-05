@@ -1,21 +1,33 @@
 import UIKit
 
-/// Kumandayla gezilen menüler (tvOS'ta UIAlertController odak motoruyla çalışır).
+/// Kumandayla gezilen menüler: sağdan kayan cam panel (MenuPanelController). Metin girişleri UIAlertController.
 extension BrowserViewController {
     // MARK: Yardımcılar
 
-    private func sheet(_ title: String?, _ message: String? = nil) -> UIAlertController {
-        UIAlertController(title: title, message: message, preferredStyle: .actionSheet)
+    private func sheet(_ title: String?, _ message: String? = nil) -> MenuPanelController {
+        MenuPanelController(title: title, subtitle: message)
     }
 
-    private func add(_ sheet: UIAlertController, _ title: String, style: UIAlertAction.Style = .default,
+    /// Satır ekler. "Başlık: değer" biçimi sağda değer olarak, "✓ " / "● " öneki seçili işaret olarak gösterilir.
+    private func add(_ sheet: MenuPanelController, _ title: String, style: UIAlertAction.Style = .default,
                      _ handler: @escaping () -> Void) {
-        sheet.addAction(UIAlertAction(title: title, style: style) { _ in handler() })
+        var text = title
+        var checked = false
+        for prefix in ["✓ ", "● "] where text.hasPrefix(prefix) {
+            text.removeFirst(prefix.count)
+            checked = true
+        }
+        var value: String?
+        if let r = text.range(of: ": "), text.distance(from: text.startIndex, to: r.lowerBound) < 34 {
+            value = String(text[r.upperBound...])
+            text = String(text[..<r.lowerBound])
+        }
+        sheet.addItem(text, value: value, symbol: MenuSymbols.symbol(for: text), destructive: style == .destructive,
+                      checked: checked, action: handler)
     }
 
-    private func finish(_ sheet: UIAlertController, cancel: String = "Kapat") {
-        sheet.addAction(UIAlertAction(title: cancel, style: .cancel))
-        present(sheet, animated: true)
+    private func finish(_ sheet: MenuPanelController, cancel: String = "Kapat") {
+        present(sheet, animated: false)
     }
 
     func prompt(_ title: String, message: String? = nil, text: String? = nil, placeholder: String? = nil,
@@ -51,65 +63,69 @@ extension BrowserViewController {
         let isWeb = !t.isHome && t.url != nil
         let link = linkAtCursor()
         let videos = isWeb ? videoCandidates() : []
-        var message = isWeb ? t.url?.absoluteString : nil
+        var subtitle = isWeb ? t.url.map { ($0.host ?? "") + $0.path } : (store.privateMode ? "Gizli gezinme" : "Ana sayfa")
         let blocked = AdBlocker.blockedCount - t.blockedAtStart
-        if isWeb, store.adBlockEnabled, blocked > 0 {
-            message = (message ?? "") + "\n\(blocked) reklam/izleyici isteği engellendi"
-        }
+        if isWeb, store.adBlockEnabled, blocked > 0 { subtitle = (subtitle ?? "") + " · \(blocked) reklam engellendi" }
 
-        let s = sheet(t.title, message)
-        add(s, "Adres yaz / Ara") { self.askAddress() }
-        add(s, "Sekmeler (\(tabs.count))") { self.showTabs() }
+        let s = MenuPanelController(title: t.title, subtitle: subtitle)
+        if e.canGoBack { s.addQuickAction("Geri", symbol: "chevron.backward") { e.goBack() } }
+        if e.canGoForward { s.addQuickAction("İleri", symbol: "chevron.forward") { e.goForward() } }
+        s.addQuickAction("Yenile", symbol: "arrow.clockwise") { self.reloadCurrent() }
+        if !t.isHome { s.addQuickAction("Ana sayfa", symbol: "house.fill") { self.goHome() } }
+        s.addQuickAction("Sekmeler", symbol: "square.on.square") { self.showTabSwitcher() }
+
+        s.addItem("Adres yaz veya ara", subtitle: "\(store.searchEngine.name) ile aranır", symbol: "magnifyingglass") { self.askAddress() }
         if let link {
-            add(s, "Bağlantıyı yeni sekmede aç") {
+            s.addItem("Bağlantıyı yeni sekmede aç", subtitle: link.host, symbol: "arrow.up.forward.square") {
                 if self.addTab(url: link, activate: false) { self.showToast("Yeni sekmede açıldı") }
             }
         }
-        if e.canGoBack { add(s, "Geri") { e.goBack() } }
-        if e.canGoForward { add(s, "İleri") { e.goForward() } }
-        add(s, "Yenile") { self.reloadCurrent() }
-        if !t.isHome { add(s, "Ana Sayfa") { self.goHome() } }
-        if videos.count == 1, let v = videos.first {
-            add(s, "Videoyu tam ekran oynat") { self.playVideo(src: v.src, time: v.time, referer: v.referer) }
-        } else if videos.count > 1 {
-            add(s, "Videoyu tam ekran oynat (\(videos.count))…") {
-                self.pick("Hangi video?", videos.map(\.title)) { i in
-                    let v = videos[i]
+
+        if isWeb {
+            s.addHeader("Bu sayfa")
+            if videos.count == 1, let v = videos.first {
+                s.addItem("Videoyu tam ekran oynat", subtitle: v.title, symbol: "play.rectangle.fill") {
                     self.playVideo(src: v.src, time: v.time, referer: v.referer)
                 }
+            } else if videos.count > 1 {
+                s.addItem("Videoyu tam ekran oynat", value: "\(videos.count) video", symbol: "play.rectangle.fill") {
+                    self.pick("Hangi video?", videos.map(\.title)) { i in
+                        let v = videos[i]
+                        self.playVideo(src: v.src, time: v.time, referer: v.referer)
+                    }
+                }
             }
-        }
-        if isWeb {
             let sources = pageSources()
             if !sources.isEmpty {
-                add(s, "Kaynaklar / oynatıcılar (\(sources.count))…") {
+                s.addItem("Kaynaklar / oynatıcılar", value: "\(sources.count)", symbol: "list.bullet.rectangle") {
                     self.pick("Kaynak seç", sources.map { ($0.active ? "● " : "") + $0.text }) { i in
                         self.selectSource(i, title: sources[i].text)
                     }
                 }
             }
             if let next = nextEpisode() {
-                add(s, next.guessed ? "Sonraki bölüm (tahmini)" : "Sonraki bölüm") { self.openNextEpisode(next.url) }
+                s.addItem("Sonraki bölüm", subtitle: next.guessed ? "Adresten tahmin edildi" : nil, symbol: "forward.end.fill") {
+                    self.openNextEpisode(next.url)
+                }
             }
-        }
-        if isWeb {
-            add(s, t.isReader ? "Okuma modundan çık" : "Okuma modu") { self.toggleReader() }
-            add(s, "Sayfada bul…") { self.askFind() }
+            s.addItem(t.isReader ? "Okuma modundan çık" : "Okuma modu", symbol: "doc.plaintext") { self.toggleReader() }
+            s.addItem("Sayfada bul", value: findCount > 0 ? "\(findIndex + 1)/\(findCount)" : nil, symbol: "text.magnifyingglass") {
+                self.askFind()
+            }
             if findCount > 0 {
-                add(s, "Sonraki eşleşme (\(findIndex + 1)/\(findCount))") { self.stepFind(1) }
-                add(s, "Aramayı temizle") { self.resetFind() }
+                s.addItem("Sonraki eşleşme", symbol: "arrow.down.circle") { self.stepFind(1) }
+                s.addItem("Aramayı temizle", symbol: "xmark.circle") { self.resetFind() }
             }
-            let zoom = store.zoom(for: t.url?.host)
-            add(s, "Yakınlaştırma: %\(zoom)") { self.askZoom() }
+            s.addItem("Yakınlaştırma", value: "%\(store.zoom(for: t.url?.host))", symbol: "plus.magnifyingglass") { self.askZoom() }
             if let url = t.url?.absoluteString {
                 if store.isBookmarked(url) {
-                    add(s, "Sık kullanılanlardan çıkar", style: .destructive) {
+                    s.addItem("Sık kullanılanlardan çıkar", symbol: "star.slash", destructive: true) {
                         self.store.bookmarks.removeAll { $0.url == url }
                         self.refreshHomeTabs()
-                        self.showToast("Çıkarıldı")
+                        self.showToast("Sık kullanılanlardan çıkarıldı")
                     }
                 } else {
-                    add(s, "Sık kullanılanlara ekle") {
+                    s.addItem("Sık kullanılanlara ekle", symbol: "star") {
                         let title = t.title.isEmpty ? (t.url?.host ?? url) : t.title
                         self.store.bookmarks.append(Bookmark(title: title, url: url))
                         self.refreshHomeTabs()
@@ -118,13 +134,17 @@ extension BrowserViewController {
                 }
             }
         }
-        add(s, "Sık Kullanılanlar") { self.showBookmarks() }
-        add(s, "Geçmiş") { self.showHistory() }
-        add(s, store.privateMode ? "Gizli gezinmeyi kapat" : "Gizli gezinme") { self.togglePrivate() }
-        add(s, "Telefondan kontrol (QR)") { self.showRemoteInfo() }
-        add(s, "Ayarlar") { self.showSettings() }
-        add(s, "Kumanda Kullanımı") { self.showHelp() }
-        finish(s)
+
+        s.addHeader("Kitaplık")
+        s.addItem("Sık kullanılanlar", value: "\(store.bookmarks.count)", symbol: "star.fill") { self.showBookmarks() }
+        s.addItem("Geçmiş", symbol: "clock.arrow.circlepath") { self.showHistory() }
+
+        s.addHeader("Pano")
+        s.addItem(store.privateMode ? "Gizli gezinmeyi kapat" : "Gizli gezinme", symbol: "eye.slash") { self.togglePrivate() }
+        s.addItem("Telefondan kontrol", subtitle: "QR kodla telefonu kumanda yap", symbol: "iphone") { self.showRemoteInfo() }
+        s.addItem("Ayarlar", symbol: "gearshape.fill") { self.showSettings() }
+        s.addItem("Kumanda kullanımı", symbol: "appletvremote.gen4") { self.showHelp() }
+        present(s, animated: false)
     }
 
     func askAddress() {
@@ -149,25 +169,7 @@ extension BrowserViewController {
     // MARK: Sekmeler
 
     func showTabs() {
-        guard presentedViewController == nil else { return }
-        let s = sheet("Sekmeler", "Oynat/Duraklat'a basılı tutarak da açabilirsin")
-        for (i, t) in tabs.enumerated() {
-            let host = t.isHome ? "Ana Sayfa" : ((t.url ?? t.pendingURL)?.host ?? "")
-            let title = t.title == host ? t.title : "\(t.title) — \(host)"
-            add(s, (i == current ? "● " : "") + title) { if i != self.current { self.activate(i) } }
-        }
-        add(s, "+ Yeni sekme") { self.addTab(url: nil, activate: true) }
-        add(s, "Bu sekmeyi kapat", style: .destructive) { self.closeTab(self.current) }
-        if tabs.count > 1 {
-            add(s, "Sekme kapat…", style: .destructive) {
-                self.pick("Kapatılacak sekme", self.tabs.map(\.title)) { self.closeTab($0) }
-            }
-            add(s, "Diğer sekmeleri kapat", style: .destructive) {
-                let keep = self.current
-                for i in stride(from: self.tabs.count - 1, through: 0, by: -1) where i != keep { self.closeTab(i) }
-            }
-        }
-        finish(s)
+        showTabSwitcher()
     }
 
     // MARK: Sık kullanılanlar

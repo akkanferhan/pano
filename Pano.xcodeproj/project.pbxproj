@@ -11,10 +11,13 @@
 		3163D7E858A9FFB8ED692599 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B1AFC18075CE2091DB2B3E /* Theme.swift */; };
 		34093FAC2233854889002299 /* RemoteServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCE0250DD7F7999CDDC4ADD4 /* RemoteServer.swift */; };
 		4F38DFE260CA6A917AE50F36 /* OpenSubtitles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8EDC015B796449FB35B0A5 /* OpenSubtitles.swift */; };
+		5D84D45323794F4DE51B47C1 /* LayoutGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C4DF0909AE0BBC9E53CB2B6 /* LayoutGuard.swift */; };
 		5E0150DAF4FCAB71A7CB4084 /* RemoteInfoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD5C87446151E0A8573B4B1D /* RemoteInfoViewController.swift */; };
+		73302B1720F15C0F4202A92A /* TabSwitcherController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1960C2CC6034C17D823E7909 /* TabSwitcherController.swift */; };
 		7594553895D0CB341E124A3F /* BrowserViewController+Remote.swift in Sources */ = {isa = PBXBuildFile; fileRef = F445FB38AA8FF8D6FE24F72D /* BrowserViewController+Remote.swift */; };
 		80C67AD9DD050995062FD748 /* VideoPlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365FE3C96C85007BC20A5EC3 /* VideoPlayerController.swift */; };
 		9307D2A20A245D1DC6C30A5B /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0623588F177B0E7311BB66DE /* Store.swift */; };
+		9AAE10D7EC668C2939BE30F5 /* MenuPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06F82F9777167F638954223C /* MenuPanel.swift */; };
 		B6117B92D7F313C88214FB55 /* BrowserViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0472B9780599C9A600AD9006 /* BrowserViewController.swift */; };
 		BF29B473D50DC0A5A1E9CE26 /* BrowserViewController+Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B64AC27B2BC3CE8463EC82 /* BrowserViewController+Menus.swift */; };
 		BF6D7725BC74D9B995194E7B /* Subtitles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8DA55794B86B7F05B6ACEE3 /* Subtitles.swift */; };
@@ -29,9 +32,12 @@
 /* Begin PBXFileReference section */
 		0472B9780599C9A600AD9006 /* BrowserViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserViewController.swift; sourceTree = "<group>"; };
 		0623588F177B0E7311BB66DE /* Store.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
+		06F82F9777167F638954223C /* MenuPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPanel.swift; sourceTree = "<group>"; };
 		18FFD055FC17CB4A48EE30E2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		1960C2CC6034C17D823E7909 /* TabSwitcherController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitcherController.swift; sourceTree = "<group>"; };
 		24816FD7623B37E865E76662 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		365FE3C96C85007BC20A5EC3 /* VideoPlayerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPlayerController.swift; sourceTree = "<group>"; };
+		3C4DF0909AE0BBC9E53CB2B6 /* LayoutGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutGuard.swift; sourceTree = "<group>"; };
 		6540C2E2370AD359ED7BF453 /* AdBlocker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdBlocker.swift; sourceTree = "<group>"; };
 		694F97CD52207D197409DF84 /* Pages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pages.swift; sourceTree = "<group>"; };
 		6C8EDC015B796449FB35B0A5 /* OpenSubtitles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenSubtitles.swift; sourceTree = "<group>"; };
@@ -59,7 +65,9 @@
 				75B64AC27B2BC3CE8463EC82 /* BrowserViewController+Menus.swift */,
 				F445FB38AA8FF8D6FE24F72D /* BrowserViewController+Remote.swift */,
 				18FFD055FC17CB4A48EE30E2 /* Info.plist */,
+				3C4DF0909AE0BBC9E53CB2B6 /* LayoutGuard.swift */,
 				78ADAF404D56F0CF0D4453E8 /* MediaSniffer.swift */,
+				06F82F9777167F638954223C /* MenuPanel.swift */,
 				6C8EDC015B796449FB35B0A5 /* OpenSubtitles.swift */,
 				694F97CD52207D197409DF84 /* Pages.swift */,
 				DD5C87446151E0A8573B4B1D /* RemoteInfoViewController.swift */,
@@ -67,6 +75,7 @@
 				0623588F177B0E7311BB66DE /* Store.swift */,
 				A8DA55794B86B7F05B6ACEE3 /* Subtitles.swift */,
 				AD13DC09C6B6022F075E1F2C /* Tab.swift */,
+				1960C2CC6034C17D823E7909 /* TabSwitcherController.swift */,
 				C3B1AFC18075CE2091DB2B3E /* Theme.swift */,
 				365FE3C96C85007BC20A5EC3 /* VideoPlayerController.swift */,
 				E881610FD10C67278F9247E8 /* WebEngine.swift */,
@@ -166,7 +175,9 @@
 				BF29B473D50DC0A5A1E9CE26 /* BrowserViewController+Menus.swift in Sources */,
 				7594553895D0CB341E124A3F /* BrowserViewController+Remote.swift in Sources */,
 				B6117B92D7F313C88214FB55 /* BrowserViewController.swift in Sources */,
+				5D84D45323794F4DE51B47C1 /* LayoutGuard.swift in Sources */,
 				C1A9058AC50E83C6E55F8C44 /* MediaSniffer.swift in Sources */,
+				9AAE10D7EC668C2939BE30F5 /* MenuPanel.swift in Sources */,
 				4F38DFE260CA6A917AE50F36 /* OpenSubtitles.swift in Sources */,
 				2D5B9D47E614864EA06B5B9F /* Pages.swift in Sources */,
 				5E0150DAF4FCAB71A7CB4084 /* RemoteInfoViewController.swift in Sources */,
@@ -174,6 +185,7 @@
 				9307D2A20A245D1DC6C30A5B /* Store.swift in Sources */,
 				BF6D7725BC74D9B995194E7B /* Subtitles.swift in Sources */,
 				CED7972C6316B6E47B428D44 /* Tab.swift in Sources */,
+				73302B1720F15C0F4202A92A /* TabSwitcherController.swift in Sources */,
 				3163D7E858A9FFB8ED692599 /* Theme.swift in Sources */,
 				80C67AD9DD050995062FD748 /* VideoPlayerController.swift in Sources */,
 				C93D36D6535B98167A256964 /* WebEngine.swift in Sources */,

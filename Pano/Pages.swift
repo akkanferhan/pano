@@ -484,6 +484,8 @@ enum Pages {
     /// Bulunanlar window.__panoSources'a kaydedilir; seçim `selectSource(i)` ile yapılır.
     static let sources = #"""
     (function(){
+      // Yalnızca oynatıcısı olan sayfalarda (iframe / video) — diğer sitelerde dil bağlantıları vb. karışmasın
+      if (!document.querySelector('iframe, video, [class*="player"], [id*="player"]')) { window.__panoSources = []; return '[]'; }
       var strong = /(kaynak|alternatif|player|oynat[ıi]c[ıi]|sunucu|server|partition|part\s*\d)/i;
       var weak = /(dublaj|altyaz[ıi]|t[üu]rk[çc]e|orijinal|ingilizce|720|1080|\bhd\b)/i;
       var avoid = /(film|dizi|kategori|filmler|diziler|t[üu]r[üu]|giri[şs]|kay[ıi]t|ileti[şs]im|yorum|payla[şs])/i;
