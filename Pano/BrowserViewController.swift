@@ -42,6 +42,9 @@ final class BrowserViewController: UIViewController {
     var findQuery: String?
     var findCount = 0
     var findIndex = 0
+    /// Son tıklanan metin alanının / açılır listenin bulunduğu çerçeve (nil = ana çerçeve).
+    weak var fieldFrame: NSObject?
+    private var videoWatch: Timer?
 
     static let barHeight: CGFloat = 76
     static let maxTabs = 8
@@ -297,6 +300,8 @@ final class BrowserViewController: UIViewController {
         if request.mainDocumentURL == nil || request.mainDocumentURL == url { // ana çerçeve gezinmesi
             t.mainRequestURL = url.absoluteString
             t.blockedAtStart = AdBlocker.blockedCount
+            t.loadStartedAt = Date()
+            if t === activeTab { stopVideoWatch() }
             t.isReader = false
             if t === activeTab { resetFind() }
         }
@@ -621,7 +626,27 @@ final class BrowserViewController: UIViewController {
     private func clickAtCursor() {
         guard let e = engine, let p = pointer() else { return }
         bounceCursor()
-        guard let info = parseObject(e.js(Pages.click(p))), let kind = info["kind"] as? String else { return }
+        stopVideoWatch()
+        // Tıklamadan önceki videolar: tıklamadan sonra yeni çıkan ya da oynamaya başlayan video aranır.
+        var baseline: [String: Bool] = [:]
+        for v in allVideos() where baseline[v.src] == nil { baseline[v.src] = v.paused }
+        let clickTime = Date()
+
+        // Tıklama bir iframe'e denk gelirse, o iframe'in çerçevesinde (gerekirse iç içe) tekrar tıkla.
+        var frame: NSObject?
+        var info = parseObject(e.js(Pages.click(p)))
+        var depth = 0
+        while let current = info, current["kind"] as? String == "frame", depth < 6 {
+            guard let parent = frame ?? e.mainFrame, let index = current["index"] as? Int,
+                  let x = current["x"] as? Double, let y = current["y"] as? Double else { break }
+            let children = e.childFrames(of: parent)
+            guard children.indices.contains(index) else { break }
+            frame = children[index]
+            info = parseObject(e.evaluate(Pages.clickInFrame(x: x, y: y), in: frame))
+            depth += 1
+        }
+        guard let info, let kind = info["kind"] as? String else { return }
+        fieldFrame = frame
         switch kind {
         case "input":
             askForText(type: info["type"] as? String ?? "", value: info["value"] as? String ?? "",
@@ -630,9 +655,11 @@ final class BrowserViewController: UIViewController {
             chooseOption(options: info["options"] as? [String] ?? [], selected: info["selected"] as? Int ?? -1,
                          label: info["label"] as? String ?? "")
         case "video":
-            if let src = info["src"] as? String { playVideo(src: src, time: info["t"] as? Double ?? 0) }
+            if let src = info["src"] as? String {
+                playVideo(src: src, time: info["t"] as? Double ?? 0, referer: info["href"] as? String)
+            }
         default:
-            break
+            watchForVideo(baseline: baseline, since: clickTime)
         }
     }
 
@@ -651,7 +678,8 @@ final class BrowserViewController: UIViewController {
             }
         }
         let apply: (Bool) -> Void = { [weak self, weak alert] submit in
-            self?.engine?.js(Pages.setFieldValue(alert?.textFields?.first?.text ?? "", submit: submit))
+            guard let self else { return }
+            self.engine?.evaluate(Pages.setFieldValue(alert?.textFields?.first?.text ?? "", submit: submit), in: self.fieldFrame)
         }
         alert.addAction(UIAlertAction(title: "Gönder", style: .default) { _ in apply(true) })
         alert.addAction(UIAlertAction(title: "Yalnızca yaz", style: .default) { _ in apply(false) })
@@ -664,7 +692,8 @@ final class BrowserViewController: UIViewController {
         let sheet = UIAlertController(title: label.isEmpty ? "Seç" : label, message: nil, preferredStyle: .actionSheet)
         for (i, option) in options.enumerated() {
             sheet.addAction(UIAlertAction(title: (i == selected ? "✓ " : "") + option, style: .default) { [weak self] _ in
-                self?.engine?.js(Pages.setSelectIndex(i))
+                guard let self else { return }
+                self.engine?.evaluate(Pages.setSelectIndex(i), in: self.fieldFrame)
             })
         }
         sheet.addAction(UIAlertAction(title: "Vazgeç", style: .cancel))
@@ -745,27 +774,106 @@ final class BrowserViewController: UIViewController {
 
     // MARK: Video
 
-    func pageVideos() -> [(src: String, time: Double)] {
-        guard let json = engine?.js(Pages.videos), let data = json.data(using: .utf8),
-              let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
-        return list.compactMap { item in
-            guard let src = item["src"] as? String else { return nil }
-            return (src, item["t"] as? Double ?? 0)
+    struct FoundVideo {
+        let src: String
+        let time: Double
+        let paused: Bool
+        let playable: Bool
+        let blob: Bool
+        let referer: String?
+    }
+
+    /// Ana çerçeve ve tüm iframe'lerdeki `<video>` öğeleri.
+    func allVideos() -> [FoundVideo] {
+        guard let e = engine else { return [] }
+        var out: [FoundVideo] = []
+        for frame in e.allFrames() {
+            guard let json = e.evaluate(Pages.videos, in: frame), let data = json.data(using: .utf8),
+                  let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { continue }
+            for item in list {
+                guard let src = item["src"] as? String else { continue }
+                out.append(FoundVideo(src: src, time: item["t"] as? Double ?? 0, paused: item["paused"] as? Bool ?? true,
+                                      playable: item["playable"] as? Bool ?? false, blob: item["blob"] as? Bool ?? false,
+                                      referer: item["href"] as? String))
+            }
+        }
+        return out
+    }
+
+    /// Menüdeki "Videoyu tam ekran oynat" için adaylar: sayfadaki videolar + bu sayfada ağdan yakalanan video adresleri.
+    func videoCandidates() -> [(title: String, src: String, time: Double, referer: String?)] {
+        var result: [(title: String, src: String, time: Double, referer: String?)] = []
+        var seen = Set<String>()
+        for v in allVideos() where v.playable && !seen.contains(v.src) {
+            seen.insert(v.src)
+            result.append(("Video · \(URL(string: v.src)?.host ?? "")\(v.paused ? "" : " (oynuyor)")", v.src, v.time, v.referer))
+        }
+        if let since = activeTab?.loadStartedAt {
+            let sniffed = MediaSniffer.items(since: since)
+            for m in sniffed.filter(\.isPlaylist) + sniffed.filter({ !$0.isPlaylist }) where !seen.contains(m.url.absoluteString) {
+                seen.insert(m.url.absoluteString)
+                result.append(("\(m.isPlaylist ? "Akış (HLS)" : "Dosya") · \(m.url.host ?? "")", m.url.absoluteString, 0, m.referer))
+            }
+        }
+        return result
+    }
+
+    /// Tıklamadan sonra ~12 sn boyunca yeni başlayan videoyu ya da ağdan istenen video adresini bekler;
+    /// bulunca tvOS oynatıcısında açar. (Film sitelerinde oynatıcı genelde başka siteden gelen bir iframe'dir.)
+    private func watchForVideo(baseline: [String: Bool], since: Date) {
+        var ticks = 0
+        videoWatch = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            ticks += 1
+            if self.presentedViewController != nil || ticks > 24 {
+                self.stopVideoWatch()
+                return
+            }
+            let videos = self.allVideos()
+            let started = videos.first { v in
+                v.playable && (baseline[v.src] == nil || (baseline[v.src] == true && !v.paused))
+            }
+            if let v = started {
+                self.stopVideoWatch()
+                self.showToast("Video oynatıcıda açılıyor…")
+                self.playVideo(src: v.src, time: v.time, referer: v.referer)
+                return
+            }
+            let sniffed = MediaSniffer.items(since: since)
+            if let m = sniffed.first(where: \.isPlaylist) ?? (ticks >= 6 ? sniffed.first : nil) {
+                self.stopVideoWatch()
+                self.showToast("Video oynatıcıda açılıyor…")
+                self.playVideo(src: m.url.absoluteString, time: 0, referer: m.referer)
+                return
+            }
+            if ticks == 24, videos.contains(where: { $0.blob }) {
+                self.showToast("Video bulundu ama doğrudan oynatılabilir bir adresi yok (korumalı akış)")
+            }
         }
     }
 
-    /// Sayfadaki videoyu tvOS'un kendi oynatıcısında tam ekran açar (kumandanın oynat/sar tuşları çalışır).
-    func playVideo(src: String, time: Double) {
-        guard let url = URL(string: src) else { return }
+    func stopVideoWatch() {
+        videoWatch?.invalidate()
+        videoWatch = nil
+    }
+
+    /// Videoyu tvOS'un kendi oynatıcısında tam ekran açar (kumandanın oynat/sar tuşları çalışır).
+    /// Film sitelerindeki akışlar çoğu zaman Referer/Origin başlığı ister; videonun bulunduğu sayfanın adresi gönderilir.
+    func playVideo(src: String, time: Double, referer: String? = nil) {
+        guard let url = URL(string: src), presentedViewController == nil else { return }
         var headers = ["User-Agent": store.currentUA]
-        if let page = activeTab?.url { headers["Referer"] = page.absoluteString }
+        if let ref = referer ?? activeTab?.url?.absoluteString, let refURL = URL(string: ref),
+           let scheme = refURL.scheme, let host = refURL.host {
+            headers["Referer"] = ref
+            headers["Origin"] = "\(scheme)://\(host)" + (refURL.port.map { ":\($0)" } ?? "")
+        }
         let options: [String: Any] = [
-            AVURLAssetHTTPCookiesKey: HTTPCookieStorage.shared.cookies(for: url) ?? [],
+            AVURLAssetHTTPCookiesKey: HTTPCookieStorage.shared.cookies ?? [],
             "AVURLAssetHTTPHeaderFieldsKey": headers,
         ]
         let player = AVPlayer(playerItem: AVPlayerItem(asset: AVURLAsset(url: url, options: options)))
         if time > 1 { player.seek(to: CMTime(seconds: time, preferredTimescale: 600)) }
-        engine?.js(Pages.pauseVideos)
+        if let e = engine { for frame in e.allFrames() { e.evaluate(Pages.pauseVideos, in: frame) } }
         let vc = AVPlayerViewController()
         vc.player = player
         present(vc, animated: true) { player.play() }
@@ -856,7 +964,7 @@ final class BrowserViewController: UIViewController {
                 self?.clickAtCursor()
                 if let text = d.string(forKey: "debugType") {
                     self?.dismiss(animated: false)
-                    self?.engine?.js(Pages.setFieldValue(text, submit: true))
+                    self?.engine?.evaluate(Pages.setFieldValue(text, submit: true), in: self?.fieldFrame)
                 }
             }
         }
@@ -878,8 +986,10 @@ final class BrowserViewController: UIViewController {
                 case "hover":
                     let xy = arg.split(separator: ",").compactMap { Double($0) }
                     if xy.count == 2 { self.cursor.center = CGPoint(x: xy[0], y: xy[1]); self.checkHover() }
-                case "videos": UserDefaults.standard.set(self.pageVideos().map(\.src), forKey: "debugVideos")
-                case "play": if let v = self.pageVideos().first { self.playVideo(src: v.src, time: v.time) }
+                case "videos":
+                    let f = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("debug-videos.txt")
+                    try? self.videoCandidates().map { "\($0.title) | \($0.src) | ref=\($0.referer ?? "-")" }.joined(separator: "\n").write(to: f, atomically: true, encoding: .utf8)
+                case "play": if let v = self.videoCandidates().first { self.playVideo(src: v.src, time: v.time, referer: v.referer) }
                 case "ua":
                     self.store.desktopMode.toggle(); self.recreateEngines()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {

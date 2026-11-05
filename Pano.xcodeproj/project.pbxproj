@@ -11,6 +11,7 @@
 		9307D2A20A245D1DC6C30A5B /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0623588F177B0E7311BB66DE /* Store.swift */; };
 		B6117B92D7F313C88214FB55 /* BrowserViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0472B9780599C9A600AD9006 /* BrowserViewController.swift */; };
 		BF29B473D50DC0A5A1E9CE26 /* BrowserViewController+Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B64AC27B2BC3CE8463EC82 /* BrowserViewController+Menus.swift */; };
+		C1A9058AC50E83C6E55F8C44 /* MediaSniffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78ADAF404D56F0CF0D4453E8 /* MediaSniffer.swift */; };
 		C93D36D6535B98167A256964 /* WebEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E881610FD10C67278F9247E8 /* WebEngine.swift */; };
 		CED7972C6316B6E47B428D44 /* Tab.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD13DC09C6B6022F075E1F2C /* Tab.swift */; };
 		E0836501AEA113ACD3D26993 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B94400302E890E027583C578 /* Assets.xcassets */; };
@@ -26,6 +27,7 @@
 		6540C2E2370AD359ED7BF453 /* AdBlocker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdBlocker.swift; sourceTree = "<group>"; };
 		694F97CD52207D197409DF84 /* Pages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pages.swift; sourceTree = "<group>"; };
 		75B64AC27B2BC3CE8463EC82 /* BrowserViewController+Menus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrowserViewController+Menus.swift"; sourceTree = "<group>"; };
+		78ADAF404D56F0CF0D4453E8 /* MediaSniffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSniffer.swift; sourceTree = "<group>"; };
 		AD13DC09C6B6022F075E1F2C /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
 		AF22A45DD1021A67EE7E2992 /* Pano.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Pano.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B94400302E890E027583C578 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -42,6 +44,7 @@
 				0472B9780599C9A600AD9006 /* BrowserViewController.swift */,
 				75B64AC27B2BC3CE8463EC82 /* BrowserViewController+Menus.swift */,
 				18FFD055FC17CB4A48EE30E2 /* Info.plist */,
+				78ADAF404D56F0CF0D4453E8 /* MediaSniffer.swift */,
 				694F97CD52207D197409DF84 /* Pages.swift */,
 				0623588F177B0E7311BB66DE /* Store.swift */,
 				AD13DC09C6B6022F075E1F2C /* Tab.swift */,
@@ -141,6 +144,7 @@
 				F0B4ABE62C96658817473B01 /* AppDelegate.swift in Sources */,
 				BF29B473D50DC0A5A1E9CE26 /* BrowserViewController+Menus.swift in Sources */,
 				B6117B92D7F313C88214FB55 /* BrowserViewController.swift in Sources */,
+				C1A9058AC50E83C6E55F8C44 /* MediaSniffer.swift in Sources */,
 				2D5B9D47E614864EA06B5B9F /* Pages.swift in Sources */,
 				9307D2A20A245D1DC6C30A5B /* Store.swift in Sources */,
 				CED7972C6316B6E47B428D44 /* Tab.swift in Sources */,

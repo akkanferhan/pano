@@ -19,10 +19,13 @@ Bu özel API sayıldığı için **App Store'a gönderilemez**; yalnızca Xcode 
 - **Sekmeler** (en fazla 8): bağlantıyı yeni sekmede açma, `window.open` açılır pencereleri arka plan sekmesine yönlendirme
 - **Kaldığın yerden devam**: açık sekmeler uygulama yeniden açılınca geri gelir (sekmeler ihtiyaç anında yüklenir)
 - **Yakınlaştırma**: sayfanın tamamını büyütür (%75–250), site başına hatırlanır; ayrıca varsayılan yakınlaştırma ve yazı boyutu
-- **Reklam/izleyici engelleme**: `URLProtocol` ile ~170 reklam/izleme alan adı engellenir, boş reklam kutuları CSS ile gizlenir
+- **Reklam/izleyici engelleme** (şimdilik varsayılan kapalı, Ayarlar'dan açılır): `URLProtocol` ile ~170 reklam/izleme alan adı engellenir, boş reklam kutuları CSS ile gizlenir
 - **Akıllı imleç**: tıklanabilir öğe üstünde büyür ve yavaşlar; açılır menüler için fare-üstü olayları gönderir
 - **Okuma modu**: makalenin ana metnini büyük yazılı, koyu bir sayfada gösterir
-- **Videoyu tam ekran oynat**: sayfadaki http(s) kaynaklı videoyu tvOS oynatıcısında açar (YouTube gibi blob/MSE akışları desteklenmez)
+- **Film sitesi oynatıcıları**: tıklama, başka siteden gelen oynatıcı iframe'lerinin içine iletilir (WebKit1 `WebFrame` API'si köken kısıtına takılmaz).
+  Tıklamadan sonra ~12 sn içinde başlayan video ya da ağdan istenen `.m3u8`/`.mp4` adresi yakalanıp tvOS oynatıcısında,
+  doğru Referer/Origin başlıklarıyla otomatik açılır. Menüde "Videoyu tam ekran oynat" bulunan tüm adayları listeler.
+  Not: bu motorda `MediaSource` yok; videoyu yalnızca MSE ile oynatan (blob:) ve DRM'li oynatıcılar desteklenmez.
 - **Sayfada bul**: tüm eşleşmeleri vurgular, ◀ ▶ ile gezilir
 - **Sık kullanılanlar**: ekle, sil, yeniden adlandır, adresi düzenle, sırala
 - **Geçmiş**: listeleme, arama, temizleme
