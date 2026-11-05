@@ -298,17 +298,19 @@ final class VideoPlayerController: AVPlayerViewController {
             return entry.duration > 0 && abs(entry.duration - duration) < 3
         }
         guard let match, match.position > 30, match.position < duration - 60, seconds < 15 else { return }
+        // Aynı video: otomatik olarak kaldığı yere atla; 15 sn boyunca "Baştan başla" düğmesi göster.
+        // Tam konuma atla (HLS'te varsayılan atlama en yakın parça başına iner)
+        player?.seek(to: CMTime(seconds: max(0, match.position - 3), preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         resumeOffer = match
-        resumeOfferUntil = seconds + 20
-        flash(L("Continue from %@?", BrowserViewController.clock(match.position)))
+        resumeOfferUntil = match.position + 15
+        flash(L("Resuming from %@", BrowserViewController.clock(match.position)))
     }
 
     private func resumeAction() -> UIAction {
-        let time = BrowserViewController.clock(resumeOffer?.position ?? 0)
-        return UIAction(title: L("Resume · %@", time), image: UIImage(systemName: "clock.arrow.circlepath")) { [weak self] _ in
-            guard let self, let offer = self.resumeOffer else { return }
+        UIAction(title: L("Start over"), image: UIImage(systemName: "backward.end.fill")) { [weak self] _ in
+            guard let self else { return }
             self.resumeOffer = nil
-            self.player?.seek(to: CMTime(seconds: offer.position, preferredTimescale: 600))
+            self.player?.seek(to: .zero)
         }
     }
 
@@ -353,7 +355,15 @@ final class VideoPlayerController: AVPlayerViewController {
     // MARK: Menüler (oynatıcının üst çubuğu)
 
     private func rebuildMenus() {
-        var items: [UIMenuElement] = [subtitleMenu(), speedMenu(), skipMenu()]
+        // ±adım düğmeleri doğrudan süre çubuğunun üstündeki sırada (alt menü değil)
+        let step = store.skipStep
+        let back = UIAction(title: L("−%d s", step), image: Self.skipSymbol(forward: false, step: step)) { [weak self] _ in
+            self?.seek(by: -Double(step))
+        }
+        let forward = UIAction(title: L("+%d s", step), image: Self.skipSymbol(forward: true, step: step)) { [weak self] _ in
+            self?.seek(by: Double(step))
+        }
+        var items: [UIMenuElement] = [back, forward, subtitleMenu(), speedMenu(), skipMenu()]
         if context.nextEpisode != nil {
             items.append(UIAction(title: context.nextEpisodeGuessed ? L("Next episode (guessed)") : L("Next episode"),
                                   image: UIImage(systemName: "forward.end.fill")) { [weak self] _ in
@@ -452,20 +462,25 @@ final class VideoPlayerController: AVPlayerViewController {
                 self?.rebuildMenus()
             }
         })
-        return UIMenu(title: L("Skip"), image: UIImage(systemName: "goforward"), children: [
-            UIAction(title: L("−%d s", Int(step)), image: UIImage(systemName: "gobackward")) { [weak self] _ in self?.seek(by: -step) },
-            UIAction(title: L("+%d s", Int(step)), image: UIImage(systemName: "goforward")) { [weak self] _ in self?.seek(by: step) },
+        _ = step
+        return UIMenu(title: L("Skip"), image: UIImage(systemName: "forward.fill"), children: [
             UIAction(title: L("Skip intro (+85 s)"), image: UIImage(systemName: "forward.fill")) { [weak self] _ in self?.seek(by: 85) },
             stepMenu,
         ])
+    }
+
+    /// SF Symbols has numbered skip icons for these steps (gobackward.10, goforward.30 …).
+    private static func skipSymbol(forward: Bool, step: Int) -> UIImage? {
+        let name = (forward ? "goforward" : "gobackward") + ([10, 15, 30, 45, 60].contains(step) ? ".\(step)" : "")
+        return UIImage(systemName: name)
     }
 
     private func seek(by delta: Double) {
         guard let player else { return }
         var target = max(0, position + delta)
         if duration > 0 { target = min(target, duration - 1) }
-        player.seek(to: CMTime(seconds: target, preferredTimescale: 600))
-        flash(String(format: "%@%d sn", delta >= 0 ? "+" : "−", Int(abs(delta))))
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        flash(delta >= 0 ? L("+%d s", Int(delta)) : L("−%d s", Int(abs(delta))))
     }
 
     // MARK: Yardımcılar

@@ -229,10 +229,12 @@ final class Store {
     /// bitmek üzere olanlar (son 90 sn) listeden çıkarılır.
     func saveProgress(page: String, videoKey: String?, title: String, position: Double, duration: Double) {
         guard position.isFinite else { return }
+        let finished = duration.isFinite && duration > 0 && duration - position < 90
+        // Kısa açılışlar (30 sn'den az) mevcut kaydı silmez; kayıt yalnızca video bitince kaldırılır.
+        guard finished || position >= 30 else { return }
         var list = watchProgress
         list.removeAll { $0.pageURL == page && ($0.videoKey == videoKey || $0.videoKey == nil) }
-        let finished = duration.isFinite && duration > 0 && duration - position < 90
-        if position >= 30 && !finished {
+        if !finished {
             list.insert(WatchProgress(pageURL: page, videoKey: videoKey, title: title, position: position,
                                       duration: duration.isFinite ? duration : 0, date: Date()), at: 0)
         }
