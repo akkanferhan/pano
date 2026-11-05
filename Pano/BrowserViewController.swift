@@ -303,6 +303,11 @@ final class BrowserViewController: UIViewController {
             t.mainRequestURL = url.absoluteString
             t.blockedAtStart = AdBlocker.blockedCount
             t.loadStartedAt = Date()
+            t.handledInterimFinish = false
+            t.finalHandled = false
+            #if DEBUG
+            t.perfStart = Date(); t.perfFinishes = 0; t.perfOurTime = 0; t.perfLogged = false
+            #endif
             t.isReader = false
             // Bu yöntem WebThread'den çağrılabilir: arayüz / zamanlayıcı işleri ana iş parçacığına.
             DispatchQueue.main.async { [weak self, weak t] in
@@ -315,11 +320,30 @@ final class BrowserViewController: UIViewController {
     }
 
     private func pageFinished(_ t: Tab) {
+        #if DEBUG
+        let perfT0 = CFAbsoluteTimeGetCurrent()
+        defer {
+            t.perfFinishes += 1
+            t.perfOurTime += CFAbsoluteTimeGetCurrent() - perfT0
+            if !t.engine.isLoading, !t.perfLogged, let u = t.url?.host {
+                t.perfLogged = true
+                let line = String(format: "%@ yükleme=%.2fs bitti-bildirimi=%d bizim-kod=%.0fms\n", u,
+                                  Date().timeIntervalSince(t.perfStart), t.perfFinishes, t.perfOurTime * 1000)
+                Self.debugAppend("perf.txt", line)
+            }
+        }
+        #endif
         let e = t.engine!
         if t === activeTab { refreshSpinnerSoon() }
+        // Ağır sayfalar onlarca ara "bitti" bildirimi gönderir (her iframe için). Ağır işler yalnızca
+        // ilk bildirimde ve yükleme tamamen bittiğinde yapılır; arada yalnızca yükleme göstergesi güncellenir.
+        let finalFinish = !e.isLoading
+        if !finalFinish && t.handledInterimFinish { return }
+        t.handledInterimFinish = true
+        if finalFinish { t.finalHandled = true }
         let marker = e.js("document.documentElement.getAttribute('data-pano')") ?? ""
         e.js(Pages.afterLoad(textScale: store.textScale, adBlock: store.adBlockEnabled))
-        for f in e.allFrames() { e.evaluate(Pages.mediaSafety, in: f) }
+        if finalFinish { for f in e.allFrames() { e.evaluate(Pages.mediaSafety, in: f) } }
         let url = e.currentURL
         t.isHome = marker == "home"
         if t.isHome {
@@ -333,12 +357,12 @@ final class BrowserViewController: UIViewController {
             t.title = title.isEmpty ? (url.host ?? url.absoluteString) : title
             t.url = url
             t.pendingURL = nil
-            if !store.privateMode { store.addHistory(title: title, url: url.absoluteString) }
+            if finalFinish && !store.privateMode { store.addHistory(title: title, url: url.absoluteString) }
             let zoom = store.zoom(for: url.host)
             if zoom != 100 { e.js(Pages.applyZoom(zoom)) }
         }
         if t === activeTab { updateBar() }
-        saveSession()
+        if finalFinish { saveSession() }
         if t.autoPlayPending, t === activeTab, !t.isHome {
             t.autoPlayPending = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self, weak t] in
@@ -452,7 +476,7 @@ final class BrowserViewController: UIViewController {
             // Tıklanabilir bir öğenin üstündeyken imleç yavaşlar; küçük bağlantılara isabet kolaylaşır.
             let f = store.cursorSpeed * (hovering ? 0.55 : 1)
             moveCursor(by: CGPoint(x: delta.x * f, y: delta.y * f))
-            if touch.timestamp - lastHoverCheck > 0.06 {
+            if touch.timestamp - lastHoverCheck > 0.12 {
                 lastHoverCheck = touch.timestamp
                 checkHover()
             }
@@ -1125,7 +1149,11 @@ final class BrowserViewController: UIViewController {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 guard let self, let e = self.engine else { return }
                 self.chrome.setLoading(e.isLoading)
-                if !e.isLoading { self.updateBar() }
+                if !e.isLoading {
+                    // Son "bitti" bildirimi hâlâ yükleniyor derken geldiyse son işleri şimdi tamamla
+                    if let t = self.activeTab, !t.finalHandled, t.handledInterimFinish { self.pageFinished(t) }
+                    self.updateBar()
+                }
             }
         }
     }
@@ -1160,6 +1188,12 @@ final class BrowserViewController: UIViewController {
     // MARK: Debug
 
     #if DEBUG
+    static func debugAppend(_ file: String, _ text: String) {
+        let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent(file)
+        if let h = try? FileHandle(forWritingTo: url) { h.seekToEndOfFile(); h.write(Data(text.utf8)); try? h.close() }
+        else { try? text.write(to: url, atomically: true, encoding: .utf8) }
+    }
+
     /// Simülatörde kumanda olmadan test için: -openURL, -debugClickX/-debugClickY [-debugType], -debugAction.
     private func runDebugLaunchArguments() {
         let d = UserDefaults.standard
@@ -1217,6 +1251,15 @@ final class BrowserViewController: UIViewController {
                     let next = self.nextEpisode().map { "\($0.url.absoluteString) tahmini=\($0.guessed)" } ?? "yok"
                     try? (self.pageSources().map { "\($0.active ? "*" : "-") \($0.text)" } + ["sonraki: \(next)"])
                         .joined(separator: "\n").write(to: f, atomically: true, encoding: .utf8)
+                case "jsbench":
+                    let r = self.engine?.js(Pages.jsBenchmark) ?? "-"
+                    Self.debugAppend("perf.txt", "JS: \(r)\n")
+                case "closefocused":
+                    self.showTabSwitcher()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        let r = (self.presentedViewController as? TabSwitcherController)?.debugCloseFocused() ?? "sekme ekranı yok"
+                        Self.debugAppend("perf.txt", "sekme-kapat: \(r)\n")
+                    }
                 case "blocked": UserDefaults.standard.set(AdBlocker.blockedCount, forKey: "debugBlockedCount")
                 default: break
                 }

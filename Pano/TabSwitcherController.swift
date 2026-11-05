@@ -49,7 +49,63 @@ final class TabSwitcherController: UIViewController, UICollectionViewDataSource,
         collection.dataSource = self
         collection.delegate = self
         view.addSubview(collection)
+        let hold = UILongPressGestureRecognizer(target: self, action: #selector(longPressed(_:)))
+        hold.allowedPressTypes = [NSNumber(value: UIPress.PressType.select.rawValue)]
+        hold.minimumPressDuration = 0.6
+        collection.addGestureRecognizer(hold)
         updateTitle()
+    }
+
+    /// Odaktaki sekme kartının sırası (yeni sekme kartı hariç).
+    private var focusedTabIndex: Int? {
+        let focused = UIFocusSystem.focusSystem(for: view)?.focusedItem as? UIView
+        var v = focused
+        while let current = v, !(current is TabCardCell) { v = current.superview }
+        guard let cell = v as? TabCardCell, let path = collection.indexPath(for: cell), path.item < cards.count else { return nil }
+        return path.item
+    }
+
+    #if DEBUG
+    /// Oynat/Duraklat ile aynı yol (odaktaki kart).
+    func debugCloseFocused() -> String {
+        guard let i = focusedTabIndex else { return "odakta sekme yok" }
+        closeTab(at: i)
+        return "kapatıldı: \(i)"
+    }
+    #endif
+
+    func closeTab(at index: Int) {
+        guard let updated = onClose?(index) else { return }
+        let removedOne = updated.count == cards.count - 1
+        cards = updated
+        updateTitle()
+        if removedOne {
+            collection.performBatchUpdates({ collection.deleteItems(at: [IndexPath(item: index, section: 0)]) }) { [weak self] _ in
+                guard let self else { return }
+                // "Şu an" etiketi başka karta geçmiş olabilir
+                self.collection.reloadItems(at: self.collection.indexPathsForVisibleItems)
+            }
+        } else {
+            collection.reloadData()
+        }
+    }
+
+    /// Basılı tutma: geç / kapat / diğerlerini kapat paneli.
+    @objc private func longPressed(_ g: UILongPressGestureRecognizer) {
+        guard g.state == .began, let i = focusedTabIndex else { return }
+        let card = cards[i]
+        let panel = MenuPanelController(title: card.title, subtitle: card.host)
+        panel.addItem("Sekmeye geç", symbol: "arrow.right.circle") { [weak self] in
+            self?.dismiss(animated: true) { [onSelect = self?.onSelect] in onSelect?(i) }
+        }
+        panel.addItem("Sekmeyi kapat", symbol: "xmark.square", destructive: true) { [weak self] in self?.closeTab(at: i) }
+        if cards.count > 1 {
+            panel.addItem("Diğer sekmeleri kapat", symbol: "xmark.square", destructive: true) { [weak self] in
+                guard let self else { return }
+                for j in stride(from: self.cards.count - 1, through: 0, by: -1) where j != i { self.closeTab(at: j) }
+            }
+        }
+        present(panel, animated: false)
     }
 
     override func viewDidLayoutSubviews() {
@@ -68,7 +124,9 @@ final class TabSwitcherController: UIViewController, UICollectionViewDataSource,
         s.append(Theme.label("Seç", symbol: "hand.tap.fill", size: 22, color: Theme.textSecondary))
         s.append(NSAttributedString(string: "  sekmeye geç      "))
         s.append(Theme.label("Oynat/Duraklat", symbol: "playpause.fill", size: 22, color: Theme.textSecondary))
-        s.append(NSAttributedString(string: "  sekmeyi kapat      "))
+        s.append(NSAttributedString(string: "  kapat      "))
+        s.append(Theme.label("Basılı tut", symbol: "hand.point.up.left.fill", size: 22, color: Theme.textSecondary))
+        s.append(NSAttributedString(string: "  seçenekler      "))
         s.append(Theme.label("Menü", symbol: "chevron.backward.circle.fill", size: 22, color: Theme.textSecondary))
         s.append(NSAttributedString(string: "  geri"))
         s.addAttributes([.font: UIFont.systemFont(ofSize: 22, weight: .medium), .foregroundColor: Theme.textSecondary],
@@ -111,13 +169,7 @@ final class TabSwitcherController: UIViewController, UICollectionViewDataSource,
         guard let press = presses.first else { return super.pressesEnded(presses, with: event) }
         switch press.type {
         case .playPause:
-            guard let cell = UIScreen.main.focusedView as? TabCardCell,
-                  let path = collection.indexPath(for: cell), path.item < cards.count,
-                  let updated = onClose?(path.item) else { return }
-            let removedOne = updated.count == cards.count - 1
-            cards = updated
-            updateTitle()
-            if removedOne { collection.performBatchUpdates { collection.deleteItems(at: [path]) } } else { collection.reloadData() }
+            if let i = focusedTabIndex { closeTab(at: i) }
         case .menu:
             dismiss(animated: true)
         default:
@@ -139,6 +191,8 @@ final class TabCardCell: UICollectionViewCell {
     private let title = UILabel()
     private let host = UILabel()
     private let badge = PaddedLabel.badge()
+    private let closeHint = PaddedLabel.badge()
+    private var isTab = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -158,6 +212,10 @@ final class TabCardCell: UICollectionViewCell {
         contentView.addSubview(title)
         contentView.addSubview(host)
         contentView.addSubview(badge)
+        closeHint.attributedText = Theme.label("Kapat", symbol: "playpause.fill", size: 18)
+        closeHint.backgroundColor = UIColor(white: 0, alpha: 0.7)
+        closeHint.alpha = 0
+        contentView.addSubview(closeHint)
         placeholder.layer.cornerRadius = 28
         placeholder.clipsToBounds = true
     }
@@ -173,6 +231,8 @@ final class TabCardCell: UICollectionViewCell {
         host.frame = CGRect(x: 6, y: title.frame.maxY + 2, width: w - 12, height: 28)
         let s = badge.sizeThatFits(CGSize(width: 300, height: 60))
         badge.frame = CGRect(x: 18, y: 18, width: s.width, height: s.height)
+        let c = closeHint.sizeThatFits(CGSize(width: 300, height: 60))
+        closeHint.frame = CGRect(x: w - c.width - 18, y: 18, width: c.width, height: c.height)
     }
 
     func configure(_ card: TabSwitcherController.Card) {
@@ -184,6 +244,7 @@ final class TabCardCell: UICollectionViewCell {
         badge.isHidden = !card.isCurrent
         badge.attributedText = Theme.label("Şu an", symbol: "checkmark.circle.fill", size: 19)
         badge.backgroundColor = Theme.violet.withAlphaComponent(0.92)
+        isTab = true
         setNeedsLayout()
     }
 
@@ -194,6 +255,7 @@ final class TabCardCell: UICollectionViewCell {
         title.text = "Yeni sekme"
         host.text = "Ana sayfayı aç"
         badge.isHidden = true
+        isTab = false
     }
 
     override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
@@ -208,6 +270,8 @@ final class TabCardCell: UICollectionViewCell {
             self.title.transform = focused ? CGAffineTransform(translationX: 0, y: 18) : .identity
             self.host.transform = self.title.transform
             self.badge.transform = focused ? CGAffineTransform(translationX: -12, y: -12) : .identity
+            self.closeHint.alpha = focused && self.isTab ? 1 : 0
+            self.closeHint.transform = focused ? CGAffineTransform(translationX: 12, y: -12) : .identity
         }
     }
 }
