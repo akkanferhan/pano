@@ -66,6 +66,7 @@ final class BrowserViewController: UIViewController {
         }
         if store.privateMode { store.endPrivate() } // gizli oturum uygulama kapanınca biter
         restoreSession()
+        setupRemote()
 
         cursor.center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
         view.addSubview(cursor)
@@ -337,6 +338,13 @@ final class BrowserViewController: UIViewController {
         }
         if t === activeTab { updateBar() }
         saveSession()
+        if t.autoPlayPending, t === activeTab, !t.isHome {
+            t.autoPlayPending = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self, weak t] in
+                guard let self, let t, t === self.activeTab else { return }
+                self.autoPlayAttempt()
+            }
+        }
     }
 
     private func pageFailed(_ t: Tab, _ error: NSError) {
@@ -364,7 +372,8 @@ final class BrowserViewController: UIViewController {
         t.isHome = true
         t.url = nil
         t.title = "Ana Sayfa"
-        t.engine.loadHTML(Pages.home(bookmarks: store.bookmarks, engine: store.searchEngine, isPrivate: store.privateMode),
+        t.engine.loadHTML(Pages.home(bookmarks: store.bookmarks, engine: store.searchEngine, isPrivate: store.privateMode,
+                                     continueWatching: store.watchProgress),
                           baseURL: nil)
         if t === activeTab { updateBar() }
     }
@@ -459,7 +468,7 @@ final class BrowserViewController: UIViewController {
         lastTouch = nil
     }
 
-    private func moveCursor(by delta: CGPoint) {
+    func moveCursor(by delta: CGPoint) {
         let area = CGRect(x: 0, y: Self.barHeight, width: view.bounds.width, height: view.bounds.height - Self.barHeight)
             .insetBy(dx: 4, dy: 4)
         let target = CGPoint(x: cursor.center.x + delta.x, y: cursor.center.y + delta.y)
@@ -470,7 +479,7 @@ final class BrowserViewController: UIViewController {
         if overflow != .zero { scrollPage(by: CGPoint(x: overflow.x * 2.5, y: overflow.y * 2.5)) }
     }
 
-    private func checkHover() {
+    func checkHover() {
         guard mode == .cursor, let e = engine, let p = pointer() else { return }
         let h = e.js(Pages.hover(p)) == "1"
         guard h != hovering else { return }
@@ -628,7 +637,7 @@ final class BrowserViewController: UIViewController {
 
     // MARK: Tıklama ve form alanları
 
-    private func clickAtCursor() {
+    func clickAtCursor() {
         guard let e = engine, let p = pointer() else { return }
         bounceCursor()
         stopVideoWatch()
@@ -871,7 +880,33 @@ final class BrowserViewController: UIViewController {
 
     /// Videoyu tvOS'un kendi oynatıcısında tam ekran açar (kumandanın oynat/sar tuşları çalışır).
     /// Film sitelerindeki akışlar çoğu zaman Referer/Origin başlığı ister; videonun bulunduğu sayfanın adresi gönderilir.
+    /// Videoyu açar. Bu sayfada yarım kalmış bir izleme varsa önce "kaldığın yerden devam?" diye sorar.
     func playVideo(src: String, time: Double, referer: String? = nil) {
+        guard presentedViewController == nil else { return }
+        if let page = activeTab?.url?.absoluteString, time < 5, let saved = store.progress(for: page) {
+            let total = saved.duration > 0 ? " / \(Self.clock(saved.duration))" : ""
+            let alert = UIAlertController(title: "Kaldığın yerden devam edilsin mi?",
+                                          message: "\(saved.title)\n\(Self.clock(saved.position))\(total)", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Devam et (\(Self.clock(saved.position)))", style: .default) { [weak self] _ in
+                self?.presentPlayer(src: src, time: saved.position, referer: referer)
+            })
+            alert.addAction(UIAlertAction(title: "Baştan başla", style: .default) { [weak self] _ in
+                self?.presentPlayer(src: src, time: 0, referer: referer)
+            })
+            alert.addAction(UIAlertAction(title: "Vazgeç", style: .cancel))
+            present(alert, animated: true)
+        } else {
+            presentPlayer(src: src, time: time, referer: referer)
+        }
+    }
+
+    static func clock(_ seconds: Double) -> String {
+        let s = Int(max(0, seconds.isFinite ? seconds : 0))
+        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
+    }
+
+    /// tvOS oynatıcısını açar (Referer/Origin başlıkları, altyazılar, ilerleme kaydı, sonraki bölüm).
+    private func presentPlayer(src: String, time: Double, referer: String?) {
         guard let url = URL(string: src), presentedViewController == nil else { return }
         var headers = ["User-Agent": store.currentUA]
         if let ref = referer ?? activeTab?.url?.absoluteString, let refURL = URL(string: ref),
@@ -886,10 +921,78 @@ final class BrowserViewController: UIViewController {
         let player = AVPlayer(playerItem: AVPlayerItem(asset: AVURLAsset(url: url, options: options)))
         if time > 1 { player.seek(to: CMTime(seconds: time, preferredTimescale: 600)) }
         let subtitles = subtitleSources()
+        let next = nextEpisode()
         if let e = engine { for frame in e.allFrames() { e.evaluate(Pages.pauseVideos, in: frame) } }
+
+        let page = activeTab?.url?.absoluteString
+        let title = activeTab?.title ?? ""
+        let context = PlaybackContext(pageURL: page, title: title, nextEpisode: next?.url, nextEpisodeGuessed: next?.guessed ?? false)
         let vc = VideoPlayerController()
-        vc.configure(player: player, subtitles: subtitles, userAgent: store.currentUA)
+        let save: (Double, Double) -> Void = { [weak self] position, duration in
+            guard let self, let page, !self.store.privateMode else { return }
+            self.store.saveProgress(page: page, title: title, position: position, duration: duration)
+        }
+        vc.onProgress = save
+        vc.onClose = { [weak self] position, duration in
+            save(position, duration)
+            self?.refreshHomeTabs()
+        }
+        vc.onNextEpisode = { [weak self] url in self?.openNextEpisode(url) }
+        vc.configure(player: player, subtitles: subtitles, userAgent: store.currentUA, context: context)
         present(vc, animated: true) { player.play() }
+    }
+
+    // MARK: Sonraki bölüm
+
+    /// Sayfadaki "sonraki bölüm" bağlantısı; yoksa adresteki bölüm numarasından tahmin.
+    func nextEpisode() -> (url: URL, guessed: Bool)? {
+        guard let e = engine, let page = activeTab?.url else { return nil }
+        if let s = e.js(Pages.nextEpisode), !s.isEmpty, let url = URL(string: s) { return (url, false) }
+        if let guess = OpenSubtitles.guessNextEpisodeURL(page) { return (guess, true) }
+        return nil
+    }
+
+    /// Sonraki bölüme gider; sayfa yüklenince oynatıcıyı kendisi başlatmayı dener.
+    func openNextEpisode(_ url: URL) {
+        guard let t = activeTab else { return }
+        t.autoPlayPending = true
+        t.engine.load(url)
+        showToast("Sonraki bölüm açılıyor…")
+    }
+
+    /// Sayfadaki en büyük oynatıcıyı bulup ortasına tıklar (sonraki bölüm otomatik başlatma).
+    func autoPlayAttempt() {
+        guard presentedViewController == nil, let e = engine, let sv = e.scrollView,
+              let info = parseObject(e.js(Pages.playerRect)),
+              let x = info["x"] as? Double, let y = info["y"] as? Double,
+              let iw = info["iw"] as? Double, iw > 0 else {
+            showToast("Oynatıcı bulunamadı — videoya kendin tıkla")
+            return
+        }
+        let px = info["px"] as? Double ?? 0, py = info["py"] as? Double ?? 0
+        let scale = Double(e.view.bounds.width) / iw
+        let docX = (x + px) * scale, docY = (y + py) * scale
+        scrollPage(to: CGPoint(x: sv.contentOffset.x, y: docY - Double(sv.bounds.height) / 2), animated: false)
+        let screen = CGPoint(x: docX - Double(sv.contentOffset.x), y: docY - Double(sv.contentOffset.y) + Double(Self.barHeight))
+        cursor.center = screen
+        showToast("Oynatıcı başlatılıyor…")
+        clickAtCursor()
+    }
+
+    // MARK: Kaynaklar
+
+    func pageSources() -> [(text: String, active: Bool)] {
+        guard let json = engine?.js(Pages.sources), let data = json.data(using: .utf8),
+              let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        return list.compactMap { item in
+            guard let text = item["text"] as? String else { return nil }
+            return (text, item["active"] as? Bool ?? false)
+        }
+    }
+
+    func selectSource(_ index: Int, title: String) {
+        guard engine?.js(Pages.selectSource(index)) == "ok" else { return showToast("Kaynak seçilemedi") }
+        showToast("“\(title)” seçildi — oynatıcıya tıkla")
     }
 
     /// Sayfadaki (tüm iframe'ler dahil) ve bu sayfada ağdan istenen altyazılar.
@@ -1065,6 +1168,13 @@ final class BrowserViewController: UIViewController {
                         case let .cues(c, l, g): return "cues \(l) [\(g ?? "-")] \(c.count) satır"
                         }
                     }.joined(separator: "\n").write(to: f, atomically: true, encoding: .utf8)
+                case "remote": self.showRemoteInfo()
+                case "next": if let n = self.nextEpisode() { self.openNextEpisode(n.url) }
+                case "sources":
+                    let f = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("debug-sources.txt")
+                    let next = self.nextEpisode().map { "\($0.url.absoluteString) tahmini=\($0.guessed)" } ?? "yok"
+                    try? (self.pageSources().map { "\($0.active ? "*" : "-") \($0.text)" } + ["sonraki: \(next)"])
+                        .joined(separator: "\n").write(to: f, atomically: true, encoding: .utf8)
                 case "blocked": UserDefaults.standard.set(AdBlocker.blockedCount, forKey: "debugBlockedCount")
                 default: break
                 }
