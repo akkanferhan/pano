@@ -50,7 +50,7 @@ extension BrowserViewController {
         let e = t.engine!
         let isWeb = !t.isHome && t.url != nil
         let link = linkAtCursor()
-        let videos = isWeb ? pageVideos() : []
+        let videos = isWeb ? videoCandidates() : []
         var message = isWeb ? t.url?.absoluteString : nil
         let blocked = AdBlocker.blockedCount - t.blockedAtStart
         if isWeb, store.adBlockEnabled, blocked > 0 {
@@ -69,8 +69,15 @@ extension BrowserViewController {
         if e.canGoForward { add(s, "İleri") { e.goForward() } }
         add(s, "Yenile") { self.reloadCurrent() }
         if !t.isHome { add(s, "Ana Sayfa") { self.goHome() } }
-        if let video = videos.first {
-            add(s, "Videoyu tam ekran oynat") { self.playVideo(src: video.src, time: video.time) }
+        if videos.count == 1, let v = videos.first {
+            add(s, "Videoyu tam ekran oynat") { self.playVideo(src: v.src, time: v.time, referer: v.referer) }
+        } else if videos.count > 1 {
+            add(s, "Videoyu tam ekran oynat (\(videos.count))…") {
+                self.pick("Hangi video?", videos.map(\.title)) { i in
+                    let v = videos[i]
+                    self.playVideo(src: v.src, time: v.time, referer: v.referer)
+                }
+            }
         }
         if isWeb {
             add(s, t.isReader ? "Okuma modundan çık" : "Okuma modu") { self.toggleReader() }
@@ -304,7 +311,7 @@ extension BrowserViewController {
         let text = """
         Dokunmatik yüzeyde kaydır: imleç (bağlantı üstünde büyür ve yavaşlar)
         İmleci kenara it: sayfa kayar
-        Tıkla: tıkla · metin alanında klavye · videoda tam ekran oynatıcı
+        Tıkla: tıkla · metin alanında klavye · oynatıcıya tıklayınca video tam ekran açılır
         Seçim tuşuna basılı tut: menü
         Oynat/Duraklat: imleç ↔ kaydırma modu
         Oynat/Duraklat'a çift bas: adres çubuğu

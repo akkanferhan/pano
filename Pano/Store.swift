@@ -146,8 +146,15 @@ final class Store {
         set { d.set(newValue.rawValue, forKey: "searchEngine") }
     }
 
+    /// Şimdilik varsayılan olarak kapalı (bazı film oynatıcıları reklam betikleri olmadan başlamıyor).
     var adBlockEnabled: Bool {
-        get { d.object(forKey: "adBlockEnabled") as? Bool ?? true }
+        get {
+            if !d.bool(forKey: "adBlockDefaultOffApplied") { // önceki sürümde açık kalmış olanları bir kez kapat
+                d.set(true, forKey: "adBlockDefaultOffApplied")
+                d.set(false, forKey: "adBlockEnabled")
+            }
+            return d.object(forKey: "adBlockEnabled") as? Bool ?? false
+        }
         set { d.set(newValue, forKey: "adBlockEnabled"); AdBlocker.enabled = newValue }
     }
 

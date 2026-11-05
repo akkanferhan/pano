@@ -26,6 +26,7 @@ enum AdBlocker {
         lock.lock(); _count += 1; lock.unlock()
     }
 
+    /// Protokol her zaman kayıtlı kalır (video adresi yakalama için); engelleme yalnızca `enabled` iken yapılır.
     static func install() {
         enabled = Store.shared.adBlockEnabled
         URLProtocol.registerClass(AdBlockProtocol.self)
@@ -88,6 +89,7 @@ final class AdBlockProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool {
         guard let url = request.url, let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else { return false }
+        MediaSniffer.note(request) // engelleme kapalıyken de video adreslerini topla
         return AdBlocker.isBlocked(url)
     }
 

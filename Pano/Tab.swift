@@ -15,6 +15,8 @@ final class Tab {
     /// Sayfa yüklenmeye başladığındaki toplam engelleme sayısı (sayfa başına sayaç için).
     var blockedAtStart = 0
     var isReader = false
+    /// Ana çerçeve gezinmesinin başladığı an (bu sayfada yakalanan video adreslerini ayırmak için).
+    var loadStartedAt = Date()
 
     /// Oturuma kaydedilecek adres; ana sayfa için boş metin.
     var sessionURL: String {

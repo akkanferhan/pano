@@ -167,40 +167,72 @@ enum Pages {
     var __panoClickable = 'a,button,input,select,textarea,label,summary,video,[onclick],[role=button],[role=link],[role=tab],[role=menuitem],[tabindex]';
     """
 
-    /// İmlecin altındaki öğeye tıklar. Metin alanı / açılır liste / video ise bunu bildirir.
+    /// Bir çerçevenin içinde, o çerçevenin görünüm koordinatlarındaki (x, y) noktasına tıklar.
+    /// iframe'e denk gelirse içine girmez; `{kind:'frame', index, x, y}` döndürür ve tıklama Swift tarafında
+    /// o iframe'in kendi çerçevesine iletilir (başka siteden gelen oynatıcılar dahil).
+    private static let clickCore = """
+    function __panoClickAt(x, y){
+      var el = document.elementFromPoint(x, y);
+      if (!el) return JSON.stringify({kind:'none'});
+      if (el.tagName==='IFRAME' || el.tagName==='FRAME') {
+        var idx = -1;
+        for (var i=0;i<window.frames.length;i++){ try { if (window.frames[i] === el.contentWindow) { idx = i; break; } } catch(e) {} }
+        if (idx >= 0) {
+          var r = el.getBoundingClientRect();
+          return JSON.stringify({kind:'frame', index:idx, x: x - r.left - (el.clientLeft||0), y: y - r.top - (el.clientTop||0)});
+        }
+      }
+      var tag = (el.tagName||'').toLowerCase();
+      var type = (el.getAttribute && (el.getAttribute('type')||'') || '').toLowerCase();
+      var textTypes = ['','text','search','email','url','tel','password','number'];
+      var label = el.getAttribute && (el.getAttribute('placeholder')||el.getAttribute('aria-label')||el.getAttribute('name')||'') || '';
+      if ((tag==='input' && textTypes.indexOf(type)>=0) || tag==='textarea' || el.isContentEditable) {
+        window.__panoField = el;
+        try { el.focus(); } catch(e) {}
+        var val = el.isContentEditable ? el.innerText : el.value;
+        return JSON.stringify({kind:'input', type:type, value:val||'', label:label});
+      }
+      if (tag==='select') {
+        window.__panoField = el;
+        var opts = [];
+        for (var k=0;k<el.options.length;k++){ opts.push(el.options[k].text); }
+        return JSON.stringify({kind:'select', options:opts, selected:el.selectedIndex, label:label});
+      }
+      var vid = __panoVideo(el);
+      if (vid) return JSON.stringify({kind:'video', src:vid.src, t:vid.t, href:location.href});
+      var a = el.closest ? el.closest('a') : null;
+      if (a && a.getAttribute('target')) a.removeAttribute('target');
+      var o = {bubbles:true,cancelable:true,view:window,clientX:x,clientY:y};
+      try { ['pointerover','pointerdown'].forEach(function(n){ el.dispatchEvent(new PointerEvent(n,o)); }); } catch(e) {}
+      ['mouseover','mousedown'].forEach(function(n){ el.dispatchEvent(new MouseEvent(n,o)); });
+      try { el.dispatchEvent(new PointerEvent('pointerup',o)); } catch(e) {}
+      el.dispatchEvent(new MouseEvent('mouseup',o));
+      if (typeof el.click === 'function') { el.click(); } else { el.dispatchEvent(new MouseEvent('click',o)); }
+      return JSON.stringify({kind:'click', tag:tag});
+    }
+    """
+
+    /// Ana çerçevede, imleç konumuna tıklar.
     static func click(_ p: Pointer) -> String {
         """
         (function(){
           \(prelude)
-          var hit = __panoAt(\(p.args)); var el = hit.el, x = hit.x, y = hit.y;
-          if (!el) return JSON.stringify({kind:'none'});
-          var tag = (el.tagName||'').toLowerCase();
-          var type = (el.getAttribute && (el.getAttribute('type')||'') || '').toLowerCase();
-          var textTypes = ['','text','search','email','url','tel','password','number'];
-          var label = el.getAttribute && (el.getAttribute('placeholder')||el.getAttribute('aria-label')||el.getAttribute('name')||'') || '';
-          if ((tag==='input' && textTypes.indexOf(type)>=0) || tag==='textarea' || el.isContentEditable) {
-            window.__panoField = el;
-            try { el.focus(); } catch(e) {}
-            var val = el.isContentEditable ? el.innerText : el.value;
-            return JSON.stringify({kind:'input', type:type, value:val||'', label:label});
-          }
-          if (tag==='select') {
-            window.__panoField = el;
-            var opts = [];
-            for (var i=0;i<el.options.length;i++){ opts.push(el.options[i].text); }
-            return JSON.stringify({kind:'select', options:opts, selected:el.selectedIndex, label:label});
-          }
-          var vid = __panoVideo(el);
-          if (vid) return JSON.stringify({kind:'video', src:vid.src, t:vid.t});
-          var a = el.closest ? el.closest('a') : null;
-          if (a && a.getAttribute('target')) a.removeAttribute('target');
-          var o = {bubbles:true,cancelable:true,view:window,clientX:x,clientY:y};
-          try { ['pointerover','pointerdown'].forEach(function(n){ el.dispatchEvent(new PointerEvent(n,o)); }); } catch(e) {}
-          ['mouseover','mousedown'].forEach(function(n){ el.dispatchEvent(new MouseEvent(n,o)); });
-          try { el.dispatchEvent(new PointerEvent('pointerup',o)); } catch(e) {}
-          el.dispatchEvent(new MouseEvent('mouseup',o));
-          if (typeof el.click === 'function') { el.click(); } else { el.dispatchEvent(new MouseEvent('click',o)); }
-          return JSON.stringify({kind:'click', tag:tag});
+          \(clickCore)
+          var s = \(p.viewWidth) / (window.innerWidth || \(p.viewWidth));
+          var x = (\(p.offsetX) + \(p.x)) / s - (window.pageXOffset||0);
+          var y = (\(p.offsetY) + \(p.y)) / s - (window.pageYOffset||0);
+          return __panoClickAt(x, y);
+        })()
+        """
+    }
+
+    /// Bir alt çerçevede (iframe), çerçevenin kendi koordinatlarıyla tıklar.
+    static func clickInFrame(x: Double, y: Double) -> String {
+        """
+        (function(){
+          \(prelude)
+          \(clickCore)
+          return __panoClickAt(\(x), \(y));
         })()
         """
     }
@@ -278,14 +310,15 @@ enum Pages {
 
     // MARK: Video
 
-    /// Sayfadaki doğrudan oynatılabilir (http/https kaynaklı) videolar.
+    /// Bu çerçevedeki videolar: kaynak adresi, oynuyor mu, konum, blob (MSE) mi, sayfa adresi (Referer için).
     static let videos = """
     (function(){
       var out = [], vs = document.querySelectorAll('video');
       for (var i=0;i<vs.length;i++){
         var v = vs[i], s = v.currentSrc || v.src;
         if (!s) { var so = v.querySelector('source'); if (so) s = so.src; }
-        if (s && /^https?:/i.test(s)) out.push({src:s, t:v.currentTime||0});
+        if (!s) continue;
+        out.push({src:s, t:v.currentTime||0, paused:!!v.paused, blob:/^blob:/i.test(s), playable:/^https?:/i.test(s), href:location.href});
       }
       return JSON.stringify(out);
     })()
