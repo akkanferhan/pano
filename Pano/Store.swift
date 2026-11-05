@@ -299,10 +299,10 @@ final class Store {
         set { d.set(newValue, forKey: "remoteEnabled") }
     }
 
-    /// Telefon sayfasının istediği 4 haneli kod (aynı ağdaki başkalarının tarayıcıyı yönetmesini engeller).
+    /// 6-digit code required by the phone page (keeps others on the same network out).
     var remotePIN: String {
-        if let pin = d.string(forKey: "remotePIN"), pin.count == 4 { return pin }
-        let pin = String(format: "%04d", Int.random(in: 0...9999))
+        if let pin = d.string(forKey: "remotePIN"), pin.count == 6 { return pin }
+        let pin = String(format: "%06d", Int.random(in: 0...999_999))
         d.set(pin, forKey: "remotePIN")
         return pin
     }

@@ -29,11 +29,13 @@ final class RemoteServer {
     #endif
 
     private var listener: NWListener?
+    /// Wrong-PIN protection: after 5 failures from an address, it is locked out for 5 minutes.
+    private var failures: [String: (count: Int, until: Date)] = [:]
     private(set) var isRunning = false
 
     var pin: String { Store.shared.remotePIN }
 
-    /// Telefonun açacağı adres (ör. http://192.168.1.20:8765/?k=1234).
+    /// Address the phone opens (e.g. http://<apple-tv-ip>:8765/?k=<pin>).
     var address: String? {
         guard let ip = Self.localIPAddress() else { return nil }
         return "http://\(ip):\(Self.port)/?k=\(pin)"
@@ -69,13 +71,18 @@ final class RemoteServer {
         receive(on: connection, buffer: Data())
     }
 
+    private static func peer(of connection: NWConnection) -> String {
+        if case let .hostPort(host, _) = connection.endpoint { return "\(host)" }
+        return "unknown"
+    }
+
     private func receive(on connection: NWConnection, buffer: Data) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, complete, error in
             guard let self else { return connection.cancel() }
             var buffer = buffer
             if let data { buffer.append(data) }
             if let request = HTTPRequest(buffer) {
-                let response = self.respond(to: request)
+                let response = self.respond(to: request, from: Self.peer(of: connection))
                 connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
             } else if complete || error != nil || buffer.count > 1_000_000 {
                 connection.cancel()
@@ -85,17 +92,25 @@ final class RemoteServer {
         }
     }
 
-    private func respond(to r: HTTPRequest) -> Data {
+    private func respond(to r: HTTPRequest, from peer: String) -> Data {
+        if let f = failures[peer], f.count >= 5, f.until > Date() {
+            return Self.http(429, "text/plain; charset=utf-8", "Too many attempts. Try again later.")
+        }
+        guard r.query["k"] == pin else {
+            var f = failures[peer] ?? (0, Date())
+            f.count += 1
+            f.until = Date().addingTimeInterval(300)
+            failures[peer] = f
+            return Self.http(403, "text/html; charset=utf-8",
+                             "<meta name=viewport content='width=device-width'><h2 style='font-family:sans-serif'>" + RemotePage.h(L("Pano: wrong PIN. Scan the QR code on the Apple TV again.")) + "</h2>")
+        }
+        failures[peer] = nil
         #if DEBUG
         if r.method == "GET", r.path.hasPrefix("/debug/") {
             let out = debugHandler?(String(r.path.dropFirst(7)), r.query) ?? "none"
             return Self.http(200, "text/plain; charset=utf-8", out)
         }
         #endif
-        guard r.query["k"] == pin else {
-            return Self.http(403, "text/html; charset=utf-8",
-                             "<meta name=viewport content='width=device-width'><h2 style='font-family:sans-serif'>" + RemotePage.h(L("Pano: wrong PIN. Scan the QR code on the Apple TV again.")) + "</h2>")
-        }
         if r.method == "GET" && r.path == "/" {
             return Self.http(200, "text/html; charset=utf-8", RemotePage.html())
         }
@@ -122,7 +137,7 @@ final class RemoteServer {
 
     private static func http(_ status: Int, _ type: String, _ body: String) -> Data {
         let bodyData = Data(body.utf8)
-        let reason = status == 200 ? "OK" : (status == 403 ? "Forbidden" : "Not Found")
+        let reason = [200: "OK", 403: "Forbidden", 429: "Too Many Requests"][status] ?? "Not Found"
         let head = "HTTP/1.1 \(status) \(reason)\r\nContent-Type: \(type)\r\nContent-Length: \(bodyData.count)\r\n" +
             "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
         return Data(head.utf8) + bodyData
