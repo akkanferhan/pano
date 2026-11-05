@@ -1,0 +1,23 @@
+name: Pano
+options:
+  bundleIdPrefix: com.ferhanakkan
+  deploymentTarget:
+    tvOS: "17.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: 43THU6L26P
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Pano:
+    type: application
+    platform: tvOS
+    sources:
+      - Pano
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ferhanakkan.pano
+        INFOPLIST_FILE: Pano/Info.plist
+        TARGETED_DEVICE_FAMILY: "3"
