@@ -1212,7 +1212,7 @@ final class BrowserViewController: UIViewController {
         }
         // ör. -debugAction "reader" | "find:kelime" | "zoom:150" | "menu" | "tabs" | "newtab:https://..." | "hover:x,y"
         if let action = d.string(forKey: "debugAction") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + (d.object(forKey: "debugDelay") as? Double ?? 5)) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + (d.object(forKey: "debugDelay") != nil ? d.double(forKey: "debugDelay") : 5)) { [weak self] in
                 guard let self else { return }
                 let parts = action.split(separator: ":", maxSplits: 1).map(String.init)
                 let arg = parts.count > 1 ? parts[1] : ""
@@ -1262,6 +1262,16 @@ final class BrowserViewController: UIViewController {
                         let r = (self.presentedViewController as? TabSwitcherController)?.debugCloseFocused() ?? "no tab switcher"
                         Self.debugAppend("perf.txt", "close-tab: \(r)\n")
                     }
+                case "opentabs": // virgülle ayrılmış adresleri 4 sn arayla yeni sekmelerde aç, sonra sekme ekranı
+                    for (i, u) in arg.split(separator: ",").enumerated() {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 4) {
+                            if let url = URL(string: String(u)) { self.addTab(url: url, activate: true) }
+                        }
+                    }
+                    let n = Double(arg.split(separator: ",").count)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + n * 4 + 1) { self.showTabSwitcher() }
+                case "search":
+                    self.present(AddressSearch.make(initialText: arg) { [weak self] text in self?.open(text) }, animated: true)
                 case "blocked": UserDefaults.standard.set(AdBlocker.blockedCount, forKey: "debugBlockedCount")
                 default: break
                 }
