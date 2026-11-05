@@ -1,0 +1,34 @@
+Pano.xcodeproj/project.pbxproj
+  s_5baf93b1090e54::t_93c2f11a947b96 11,44,70,177
+Pano/Pages.swift
+  s_5baf93b1090e54::t_27e02e493bc66c 38-42,53,92,121,151
+  s_5baf93b1090e54::t_f57f8fc654aecb 35-37,130
+  s_5baf93b1090e54::t_16e07432c21a0e 31,43-52,54-85,89-91,93,99,101-103,106-111,113-114,117-118,122-126,129,131-143,152,155-156
+Pano/RemoteServer.swift
+  s_5baf93b1090e54::t_24095b97579898 180-181,183,185-187,191
+Pano/Theme.swift
+  s_5baf93b1090e54::t_61baf7d41de166 1-155,157-188,190-199,207-208,210-304
+  s_5baf93b1090e54::t_cc994e69d01ab7 156
+  s_5baf93b1090e54::t_293340d1606173 189
+  s_5baf93b1090e54::t_c2e45bac7e7f29 200-202,204-206
+  s_5baf93b1090e54::t_d6a3a5b1a1006c 209
+Pano/BrowserViewController.swift
+  s_5baf93b1090e54::t_93c2f11a947b96 351
+  s_5baf93b1090e54::t_d34b3a708bcb0d 19-26,48-49,60-61,86-87,94-95,99-131,154-155,218,224-225,406-408,410-411,413-423,428,477,482,492,638-640,1075-1076,1081-1096,1100,1182-1183,1186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "65b6ba2c0bb6c3f0353d8c685876785cb3798820",
+  "prompts": {},
+  "sessions": {
+    "s_5baf93b1090e54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "601d29e4-ba43-4522-885f-d93753211e45",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Ferhan Akkan"
+    }
+  }
+}
